@@ -80,6 +80,7 @@ def _run_default(
     parser = argparse.ArgumentParser(prog="bibtool")
     parser.add_argument("target", nargs="?")
     parser.add_argument("--bib", dest="bib_path", default="references.bib")
+    parser.add_argument("--y", action="store_true", dest="yes")
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--query", nargs="+")
     mode.add_argument("--name", nargs="+")
@@ -103,11 +104,12 @@ def _run_default(
             stdin=stdin,
             stdout=stdout,
             origin=f'INSPIRE query "{query}"',
+            auto_confirm=args.yes,
         )
 
     if not args.target:
         raise CliError("Provide a target BibTeX path or use --query/--name/--title.")
-    return _merge_template(target_path=Path(args.target), stdin=stdin, stdout=stdout)
+    return _merge_template(target_path=Path(args.target), stdin=stdin, stdout=stdout, auto_confirm=args.yes)
 
 
 def _run_search(argv: Sequence[str], *, stdout: TextIO, provider: InspireClient) -> int:
@@ -139,7 +141,7 @@ def _run_search(argv: Sequence[str], *, stdout: TextIO, provider: InspireClient)
     return 0
 
 
-def _merge_template(*, target_path: Path, stdin: TextIO, stdout: TextIO) -> int:
+def _merge_template(*, target_path: Path, stdin: TextIO, stdout: TextIO, auto_confirm: bool) -> int:
     template_dir = os.environ.get("LATEX_TEMPLATE_DIR")
     if not template_dir:
         raise CliError("LATEX_TEMPLATE_DIR is not set.")
@@ -155,6 +157,7 @@ def _merge_template(*, target_path: Path, stdin: TextIO, stdout: TextIO) -> int:
         stdin=stdin,
         stdout=stdout,
         origin=str(source_path),
+        auto_confirm=auto_confirm,
     )
 
 
@@ -165,6 +168,7 @@ def _add_entries(
     stdin: TextIO,
     stdout: TextIO,
     origin: str,
+    auto_confirm: bool,
 ) -> int:
     existing = _read_bib_entries(target_path) if target_path.exists() else []
     merged_entries, added = _merge_entries(existing, incoming)
@@ -173,7 +177,7 @@ def _add_entries(
         stdout.write(f"No new entries added from {origin}.\n")
         return 0
 
-    _double_confirm_large_additions(len(added), stdin=stdin, stdout=stdout)
+    _double_confirm_large_additions(len(added), stdin=stdin, stdout=stdout, auto_confirm=auto_confirm)
     target_path.write_text(write_bibtex(merged_entries), encoding="utf-8")
     stdout.write(f"Added {len(added)} entries to {target_path}.\n")
     return 0
@@ -210,23 +214,34 @@ def _entry_looks_empty(entry: BibEntry) -> bool:
     return not normalize_for_match(entry.title) and not normalize_for_match(entry.author)
 
 
-def _double_confirm_large_additions(count: int, *, stdin: TextIO, stdout: TextIO) -> None:
+def _double_confirm_large_additions(count: int, *, stdin: TextIO, stdout: TextIO, auto_confirm: bool) -> None:
     if count <= 10:
+        return
+
+    if auto_confirm:
         return
 
     if not getattr(stdin, "isatty", lambda: False)():
         raise CliError(f"Refusing to add {count} entries non-interactively; rerun in a terminal to confirm.")
 
     stdout.write(f"{count} entries are about to be added.\n")
-    stdout.write('Type "add" to continue: ')
+    stdout.write("Continue? [y/N]: ")
+    _flush_output(stdout)
     first = stdin.readline().strip().lower()
-    if first != "add":
+    if first not in {"y", "yes"}:
         raise CliError("Aborted before writing changes.")
 
-    stdout.write(f'Type "{count}" to confirm the final add: ')
-    second = stdin.readline().strip()
-    if second != str(count):
+    stdout.write(f"Final confirmation to add {count} entries? [y/N]: ")
+    _flush_output(stdout)
+    second = stdin.readline().strip().lower()
+    if second not in {"y", "yes"}:
         raise CliError("Aborted before writing changes.")
+
+
+def _flush_output(stream: TextIO) -> None:
+    flush = getattr(stream, "flush", None)
+    if callable(flush):
+        flush()
 
 
 def _install_bash_completion() -> Path:
@@ -249,7 +264,7 @@ _bibtool_completion() {
         prev="${COMP_WORDS[COMP_CWORD-1]}"
     fi
     cword=${COMP_CWORD}
-    root_opts="search --bib --query --name --title --print-completion --install-completion -h --help"
+    root_opts="search --bib --query --name --title --y --print-completion --install-completion -h --help"
     search_opts="--name --title --limit -h --help"
 
     case "${prev}" in

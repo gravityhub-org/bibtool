@@ -12,6 +12,7 @@ uv tool install --upgrade git+https://github.com/gravityhub-org/bibtool.git && u
 
 ```bash
 bibtool references.bib
+bibtool --y --name Otto Hannuksela
 bibtool --query Otto Hannuksela
 bibtool --name Otto Hannuksela
 bibtool --title GWTC-5
@@ -28,7 +29,7 @@ bibtool --install-completion
 - Duplicate detection is case-insensitive and checks title, DOI, and eprint rather than only BibTeX keys.
 - Newly added keys use `FirstAuthorYearFirstTwoTitleWords`, while existing keys in the destination file stay unchanged.
 - Output is sorted by year, then first author, then title.
-- Adding more than 10 entries requires two interactive confirmations.
+- Adding more than 10 entries requires two interactive confirmations unless `--y` is passed.
 
 ## Bash completion
 

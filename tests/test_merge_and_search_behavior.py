@@ -94,6 +94,27 @@ class CliFailurePathTests(unittest.TestCase):
             self.assertFalse(target.exists())
             self.assertIn("Refusing to add 11 entries non-interactively", stderr.getvalue())
 
+    def test_large_addition_noninteractive_with_y_writes_file(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "references.bib"
+            provider = StubProvider(
+                query_entries=[
+                    _entry(f"Remote{index}", author="Hannuksela, Otto", title=f"Paper {index}", year="2024")
+                    for index in range(11)
+                ]
+            )
+
+            exit_code = run(
+                ["--y", "--name", "Otto", "Hannuksela", "--bib", str(target)],
+                stdin=io.StringIO(),
+                stdout=io.StringIO(),
+                stderr=io.StringIO(),
+                provider=provider,
+            )
+
+            self.assertEqual(exit_code, 0)
+            self.assertTrue(target.exists())
+
     def test_large_addition_wrong_second_confirmation_aborts_without_writing(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp) / "references.bib"
@@ -107,7 +128,7 @@ class CliFailurePathTests(unittest.TestCase):
             stderr = io.StringIO()
             exit_code = run(
                 ["--name", "Otto", "Hannuksela", "--bib", str(target)],
-                stdin=TtyStringIO("add\n10\n"),
+                stdin=TtyStringIO("y\nn\n"),
                 stdout=io.StringIO(),
                 stderr=stderr,
                 provider=provider,

@@ -19,6 +19,16 @@ class TtyStringIO(io.StringIO):
         return True
 
 
+class FlushTrackingStringIO(TtyStringIO):
+    def __init__(self, value: str = "") -> None:
+        super().__init__(value)
+        self.flush_count = 0
+
+    def flush(self) -> None:
+        self.flush_count += 1
+        super().flush()
+
+
 class StubProvider:
     def __init__(self, *, query_entries=None, query_results=None) -> None:
         self.query_entries = query_entries or []
@@ -168,7 +178,7 @@ class BibtoolCliTests(unittest.TestCase):
             stderr = io.StringIO()
             exit_code = run(
                 ["--name", "Otto", "Hannuksela", "--bib", str(target)],
-                stdin=TtyStringIO("add\n11\n"),
+                stdin=TtyStringIO("y\ny\n"),
                 stdout=stdout,
                 stderr=stderr,
                 provider=provider,
@@ -176,9 +186,64 @@ class BibtoolCliTests(unittest.TestCase):
 
             self.assertEqual(exit_code, 0)
             self.assertTrue(target.exists())
-            self.assertIn('Type "add" to continue:', stdout.getvalue())
+            self.assertIn("Continue? [y/N]:", stdout.getvalue())
             self.assertEqual(target.read_text(encoding="utf-8").count("@article{"), 11)
             self.assertIn(("author", "Otto Hannuksela"), provider.fetch_calls)
+
+    def test_large_import_skips_confirmation_with_y_flag(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "references.bib"
+            provider = StubProvider(
+                query_entries=[
+                    _entry(
+                        f"RemoteKey{index}",
+                        author="Hannuksela, Otto",
+                        title=f"Paper {index}",
+                        year="2024",
+                    )
+                    for index in range(11)
+                ]
+            )
+
+            stdout = io.StringIO()
+            exit_code = run(
+                ["--y", "--name", "Otto", "Hannuksela", "--bib", str(target)],
+                stdin=io.StringIO(),
+                stdout=stdout,
+                stderr=io.StringIO(),
+                provider=provider,
+            )
+
+            self.assertEqual(exit_code, 0)
+            self.assertTrue(target.exists())
+            self.assertNotIn("Continue? [y/N]:", stdout.getvalue())
+
+    def test_large_import_flushes_confirmation_prompts(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "references.bib"
+            provider = StubProvider(
+                query_entries=[
+                    _entry(
+                        f"RemoteKey{index}",
+                        author="Hannuksela, Otto",
+                        title=f"Paper {index}",
+                        year="2024",
+                    )
+                    for index in range(11)
+                ]
+            )
+
+            stdout = FlushTrackingStringIO()
+            exit_code = run(
+                ["--name", "Otto", "Hannuksela", "--bib", str(target)],
+                stdin=TtyStringIO("y\ny\n"),
+                stdout=stdout,
+                stderr=io.StringIO(),
+                provider=provider,
+            )
+
+            self.assertEqual(exit_code, 0)
+            self.assertGreaterEqual(stdout.flush_count, 2)
 
     def test_search_title_is_case_insensitive(self) -> None:
         provider = StubProvider(
@@ -255,6 +320,7 @@ class BibtoolCliTests(unittest.TestCase):
         self.assertIn("_bibtool_completion()", script)
         self.assertIn("complete -F _bibtool_completion bibtool", script)
         self.assertIn("--install-completion", script)
+        self.assertIn("--y", script)
 
     def test_install_completion_writes_expected_file(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
