@@ -30,11 +30,22 @@ class FlushTrackingStringIO(TtyStringIO):
 
 
 class StubProvider:
-    def __init__(self, *, query_entries=None, query_results=None, author_entries=None, title_entries=None) -> None:
+    def __init__(
+        self,
+        *,
+        query_entries=None,
+        query_results=None,
+        author_entries=None,
+        title_entries=None,
+        author_results=None,
+        title_results=None,
+    ) -> None:
         self.query_entries = query_entries or []
         self.author_entries = author_entries if author_entries is not None else list(self.query_entries)
         self.title_entries = title_entries if title_entries is not None else list(self.query_entries)
         self.query_results = query_results or []
+        self.author_results = author_results if author_results is not None else list(self.query_results)
+        self.title_results = title_results if title_results is not None else list(self.query_results)
         self.seen_queries: list[tuple[str, int | None]] = []
         self.fetch_calls: list[tuple[str, str]] = []
 
@@ -57,10 +68,14 @@ class StubProvider:
         return list(self.title_entries)
 
     def search_author(self, query: str, limit: int | None = 20):
-        return self.search(query, limit=limit)
+        self.seen_queries.append((query, limit))
+        results = list(self.author_results)
+        return results if limit is None else results[:limit]
 
     def search_title(self, query: str, limit: int | None = 20):
-        return self.search(query, limit=limit)
+        self.seen_queries.append((query, limit))
+        results = list(self.title_results)
+        return results if limit is None else results[:limit]
 
 
 class BibtoolCliTests(unittest.TestCase):
@@ -376,6 +391,7 @@ class BibtoolCliTests(unittest.TestCase):
 
         self.assertEqual(exit_code, 0)
         self.assertIn("Searching For Gravitational Waves", stdout.getvalue())
+        self.assertIn("\033]8;;https://inspirehep.net/literature/101\033\\Searching For Gravitational Waves\033]8;;\033\\", stdout.getvalue())
 
     def test_search_positional_query_uses_unified_provider_search(self) -> None:
         provider = StubProvider(
@@ -403,7 +419,7 @@ class BibtoolCliTests(unittest.TestCase):
 
     def test_search_allows_name_and_title_together(self) -> None:
         provider = StubProvider(
-            query_results=[
+            author_results=[
                 SearchResult(
                     recid=301,
                     title="Author Match",
@@ -411,9 +427,17 @@ class BibtoolCliTests(unittest.TestCase):
                     year="2024",
                 ),
                 SearchResult(
-                    recid=302,
-                    title="Title Match",
-                    authors=["Cornish, Neil"],
+                    recid=999,
+                    title="Wrong Author Only",
+                    authors=["Hannuksela, Otto"],
+                    year="2022",
+                ),
+            ],
+            title_results=[
+                SearchResult(
+                    recid=301,
+                    title="Author Match",
+                    authors=["Hannuksela, Otto"],
                     year="2025",
                 ),
             ]
@@ -431,7 +455,7 @@ class BibtoolCliTests(unittest.TestCase):
         self.assertIn(("Otto Hannuksela", 20), provider.seen_queries)
         self.assertIn(("GWTC-5", 20), provider.seen_queries)
         self.assertIn("Author Match", stdout.getvalue())
-        self.assertIn("Title Match", stdout.getvalue())
+        self.assertNotIn("Wrong Author Only", stdout.getvalue())
 
     def test_search_dedupes_combined_name_and_title_results(self) -> None:
         shared = SearchResult(
@@ -441,7 +465,8 @@ class BibtoolCliTests(unittest.TestCase):
             year="2024",
         )
         provider = StubProvider(
-            query_results=[shared, shared],
+            author_results=[shared, shared],
+            title_results=[shared],
         )
 
         stdout = io.StringIO()
@@ -454,6 +479,30 @@ class BibtoolCliTests(unittest.TestCase):
 
         self.assertEqual(exit_code, 0)
         self.assertEqual(stdout.getvalue().count("Shared Match"), 1)
+
+    def test_search_name_and_title_requires_title_match_in_title(self) -> None:
+        provider = StubProvider(
+            author_results=[
+                SearchResult(
+                    recid=501,
+                    title="A Paper Without Keyword",
+                    authors=["Cornish, Neil"],
+                    year="2024",
+                )
+            ],
+            title_results=[],
+        )
+
+        stdout = io.StringIO()
+        exit_code = run(
+            ["search", "--name", "Neil", "Cornish", "--title", "Bayes"],
+            stdout=stdout,
+            stderr=io.StringIO(),
+            provider=provider,
+        )
+
+        self.assertEqual(exit_code, 0)
+        self.assertIn("No matching records found.", stdout.getvalue())
 
     def test_search_rejects_positional_query_mixed_with_name_or_title(self) -> None:
         stderr = io.StringIO()

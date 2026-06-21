@@ -58,10 +58,20 @@ class InspireClient:
         )
 
     def search_title(self, query: str, limit: int | None = 20) -> list[SearchResult]:
-        return self.search(query, limit=limit)
+        normalized_query_words = _normalized_words(query)
+        return self._search_records(
+            self._title_query(query),
+            matcher=lambda result: _text_contains_all_words(result.title, normalized_query_words),
+            limit=limit,
+        )
 
     def search_author(self, query: str, limit: int | None = 20) -> list[SearchResult]:
-        return self.search(query, limit=limit)
+        normalized_query_words = _normalized_words(query)
+        return self._search_records(
+            self._author_query(query),
+            matcher=lambda result: any(_text_contains_all_words(author, normalized_query_words) for author in result.authors),
+            limit=limit,
+        )
 
     def fetch_entry(self, recid: int) -> BibEntry:
         body = self._request_text(f"{self.base_url}/{recid}?format=bibtex")
@@ -240,6 +250,13 @@ def _result_contains_all_words(result: SearchResult, required_words: list[str]) 
     if not required_words:
         return True
     haystack = normalize_for_match(" ".join([result.title, result.abstract, *result.authors]))
+    return all(word in haystack for word in required_words)
+
+
+def _text_contains_all_words(text: str, required_words: list[str]) -> bool:
+    if not required_words:
+        return True
+    haystack = normalize_for_match(text)
     return all(word in haystack for word in required_words)
 
 

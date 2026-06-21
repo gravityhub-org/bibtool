@@ -141,11 +141,12 @@ def _run_search(argv: Sequence[str], *, stdout: TextIO, provider: InspireClient)
     else:
         if not args.name and not args.title:
             raise CliError("Search query cannot be empty.")
-        if args.name:
-            results.extend(provider.search_author(" ".join(args.name), limit=args.limit))
-        if args.title:
-            results.extend(provider.search_title(" ".join(args.title), limit=args.limit))
-        results = _dedupe_search_results(results)[: args.limit]
+        name_results = provider.search_author(" ".join(args.name), limit=args.limit) if args.name else []
+        title_results = provider.search_title(" ".join(args.title), limit=args.limit) if args.title else []
+        if args.name and args.title:
+            results = _intersect_search_results(name_results, title_results)[: args.limit]
+        else:
+            results = _dedupe_search_results(name_results or title_results)[: args.limit]
 
     if not results:
         stdout.write("No matching records found.\n")
@@ -154,7 +155,9 @@ def _run_search(argv: Sequence[str], *, stdout: TextIO, provider: InspireClient)
     for result in results:
         author = result.first_author or "Unknown"
         year = result.year or "????"
-        stdout.write(f"[{result.recid}] {author} ({year}) {result.title}\n")
+        url = f"https://inspirehep.net/literature/{result.recid}"
+        linked_title = _terminal_link(result.title, url)
+        stdout.write(f"[{result.recid}] {author} ({year}) {linked_title}\n")
     return 0
 
 
@@ -167,6 +170,15 @@ def _dedupe_search_results(results: list) -> list:
         seen.add(result.recid)
         deduped.append(result)
     return deduped
+
+
+def _intersect_search_results(left: list, right: list) -> list:
+    right_ids = {result.recid for result in right}
+    return _dedupe_search_results([result for result in left if result.recid in right_ids])
+
+
+def _terminal_link(text: str, url: str) -> str:
+    return f"\033]8;;{url}\033\\{text}\033]8;;\033\\"
 
 
 def _default_import_target_path(bib_path: str | None) -> Path:
