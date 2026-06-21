@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 import json
 import re
@@ -12,6 +13,7 @@ from .bibtex import (
     BibEntry,
     best_publication_info,
     enrich_entry_from_metadata,
+    entry_needs_metadata_enrichment,
     first_author_name,
     merge_entry_fields,
     normalize_inspire_entry,
@@ -59,6 +61,10 @@ class InspireClient:
     def __init__(self, base_url: str = "https://inspirehep.net/api/literature", timeout: float = 10.0) -> None:
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
+        self._recid_cache: dict[str, int] = {}
+
+    def clear_lookup_cache(self) -> None:
+        self._recid_cache.clear()
 
     def lookup(
         self,
@@ -147,43 +153,79 @@ class InspireClient:
         entries = parse_bibtex(body)
         if not entries:
             raise InspireError(f"INSPIRE returned no BibTeX for record {recid}.")
-        metadata = self._fetch_metadata(recid)
-        entry = enrich_entry_from_metadata(entries[0], metadata)
+        entry = entries[0]
+        if entry_needs_metadata_enrichment(entry):
+            payload = self._request_json(f"{self.base_url}/{recid}?format=json")
+            metadata = payload.get("metadata")
+            if isinstance(metadata, dict):
+                entry = enrich_entry_from_metadata(entry, metadata)
         return normalize_inspire_entry(entry)
-
-    def _fetch_metadata(self, recid: int) -> dict[str, Any]:
-        payload = self._request_json(f"{self.base_url}/{recid}?format=json")
-        metadata = payload.get("metadata")
-        return metadata if isinstance(metadata, dict) else {}
 
     def lookup_recid(self, entry: BibEntry) -> int | None:
         eprint = strip_outer_wrappers(entry.fields.get("eprint", ""))
         if eprint:
-            recid = self._lookup_recid_from_query(f"eprint:{eprint}")
+            cache_key = f"eprint:{eprint}"
+            if cache_key in self._recid_cache:
+                return self._recid_cache[cache_key]
+            recid = self._lookup_recid_from_query(f"eprint:{eprint}", limit=5)
             if recid is not None:
+                self._recid_cache[cache_key] = recid
                 return recid
 
         doi = _normalize_doi(entry.fields.get("doi", ""))
         if doi:
-            recid = self._lookup_recid_from_query(f"doi:{doi}")
+            cache_key = f"doi:{doi}"
+            if cache_key in self._recid_cache:
+                return self._recid_cache[cache_key]
+            recid = self._lookup_recid_from_query(f"doi:{doi}", limit=5)
             if recid is not None:
+                self._recid_cache[cache_key] = recid
                 return recid
 
         author = first_author_name(entry.author)
         title = strip_outer_wrappers(entry.title)
         if author and title:
+            cache_key = f"name-title:{normalize_for_match(author)}:{normalize_for_match(title)}"
+            if cache_key in self._recid_cache:
+                return self._recid_cache[cache_key]
             spec = self.resolve_lookup(name=author, title=_title_lookup_terms(title))
-            results = self._search_records(spec.query, matcher=spec.result_matcher, limit=20)
-            return _pick_preferred_recid(results)
+            results = self._search_records(spec.query, matcher=spec.result_matcher, limit=10)
+            recid = _pick_preferred_recid(results)
+            if recid is not None:
+                self._recid_cache[cache_key] = recid
+            return recid
         if title:
+            cache_key = f"title:{normalize_for_match(title)}"
+            if cache_key in self._recid_cache:
+                return self._recid_cache[cache_key]
             spec = self.resolve_lookup(title=_title_lookup_terms(title))
-            results = self._search_records(spec.query, matcher=spec.result_matcher, limit=20)
-            return _pick_preferred_recid(results)
+            results = self._search_records(spec.query, matcher=spec.result_matcher, limit=10)
+            recid = _pick_preferred_recid(results)
+            if recid is not None:
+                self._recid_cache[cache_key] = recid
+            return recid
         return None
 
-    def _lookup_recid_from_query(self, query: str) -> int | None:
-        results = self._search_records(query, matcher=lambda _result: True, limit=20)
+    def _lookup_recid_from_query(self, query: str, *, limit: int = 5) -> int | None:
+        results = self._search_records(query, matcher=lambda _result: True, limit=limit)
         return _pick_preferred_recid(results)
+
+    def refresh_entries(self, entries: list[BibEntry], *, workers: int = 8) -> list[BibEntry | None]:
+        if not entries:
+            return []
+        if workers <= 1:
+            return [self.refresh_entry(entry) for entry in entries]
+
+        refreshed: list[BibEntry | None] = [None] * len(entries)
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            futures = {
+                executor.submit(self.refresh_entry, entry): index
+                for index, entry in enumerate(entries)
+            }
+            for future in futures:
+                index = futures[future]
+                refreshed[index] = future.result()
+        return refreshed
 
     def refresh_entry(self, entry: BibEntry) -> BibEntry | None:
         recid = self.lookup_recid(entry)

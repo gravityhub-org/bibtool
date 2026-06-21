@@ -32,6 +32,7 @@ bibtool --install-completion
 - `search` takes plain search terms and queries INSPIRE HEP without modifying files.
 - `update` refreshes every entry in a bibliography from INSPIRE, preserving existing BibTeX keys.
 - `update` defaults to `$LATEX_TEMPLATE_DIR/references.bib`, or accepts a path/`--bib`.
+- `update` runs INSPIRE requests in parallel (`--workers`, default 8) and skips JSON metadata fetches when BibTeX already has full publication data.
 - `update` looks up records by eprint, then DOI, then author and title.
 - `update` prefers published INSPIRE records over preprint-only ones and fills in journal, volume, pages, and DOI from INSPIRE metadata when a work has since been published.
 - `search --name ... --title ...` can also combine both filters; results are merged and de-duplicated.

@@ -9,7 +9,7 @@ import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from bibtool.bibtex import BibEntry
+from bibtool.bibtex import BibEntry, entry_needs_metadata_enrichment
 from bibtool.cli import run
 from bibtool.inspire import InspireClient
 
@@ -27,6 +27,9 @@ class UpdateProvider:
             fresh.key = entry.key
             return fresh
         return None
+
+    def refresh_entries(self, entries: list[BibEntry], *, workers: int = 8) -> list[BibEntry | None]:
+        return [self.refresh_entry(entry) for entry in entries]
 
 
 class UpdateCommandTests(unittest.TestCase):
@@ -279,6 +282,42 @@ class LookupRecidTests(unittest.TestCase):
         self.assertEqual(entry.fields["doi"], "10.1103/PhysRevD.91.084034")
         self.assertEqual(entry.fields["pages"], "084034")
 
+    def test_fetch_entry_skips_metadata_when_bibtex_is_complete(self) -> None:
+        client = RecordingUpdateClient(
+            search_results={},
+            bibtex_by_recid={
+                1: """@article{Published,
+  author = {Doe, Jane},
+  title = {A Paper},
+  journal = {Phys. Rev. D},
+  doi = {10.1/example},
+  pages = {123},
+  year = {2020}
+}
+""",
+            },
+        )
+
+        client.fetch_entry(1)
+
+        self.assertEqual(client.json_requests, 0)
+        self.assertEqual(client.text_requests, 1)
+
+    def test_lookup_recid_uses_cache(self) -> None:
+        client = RecordingUpdateClient(
+            search_results={"eprint:2510.07228": [301]},
+            bibtex_by_recid={},
+        )
+        entry = BibEntry(
+            entry_type="article",
+            key="Key",
+            fields={"eprint": "2510.07228", "title": "Title", "author": "Ray, Anarya"},
+        )
+
+        self.assertEqual(client.lookup_recid(entry), 301)
+        self.assertEqual(client.lookup_recid(entry), 301)
+        self.assertEqual(client.search_queries.count("eprint:2510.07228"), 1)
+
 
 class RecordingUpdateClient(InspireClient):
     def __init__(
@@ -296,6 +335,8 @@ class RecordingUpdateClient(InspireClient):
         self.metadata_by_recid = metadata_by_recid or {}
         self.requested_urls: list[str] = []
         self.search_queries: list[str] = []
+        self.json_requests = 0
+        self.text_requests = 0
 
     def _search_records(self, query, *, matcher, limit):
         from bibtool.inspire import SearchResult
@@ -316,7 +357,12 @@ class RecordingUpdateClient(InspireClient):
     def _fetch_metadata(self, recid: int) -> dict:
         return self.metadata_by_recid.get(recid, {})
 
+    def _request_json(self, url: str):
+        self.json_requests += 1
+        return {"metadata": self._fetch_metadata(int(url.rsplit("/", 1)[-1].split("?", 1)[0]))}
+
     def _request_text(self, url: str) -> str:
+        self.text_requests += 1
         self.requested_urls.append(url)
         if "?format=bibtex" in url:
             recid = int(url.rsplit("/", 1)[-1].split("?", 1)[0])

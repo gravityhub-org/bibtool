@@ -1,3 +1,17 @@
+@article{Littenberg2015BayesianInference,
+  author = {Littenberg, Tyson B. and Cornish, Neil J.},
+  title = {Bayesian inference for spectral estimation of gravitational wave detector noise},
+  journal = {Phys. Rev. D},
+  archiveprefix = {arXiv},
+  eprint = {1410.3852},
+  primaryclass = {gr-qc},
+  doi = {10.1103/PhysRevD.91.084034},
+  year = {2015},
+  number = {8},
+  pages = {084034},
+  volume = {91}
+}
+
 @article{Abbott2017AllSkySearch,
   author = {Abbott, Benjamin P. and others},
   title = {All-sky Search for Periodic Gravitational Waves in the O1 LIGO Data},
@@ -1087,6 +1101,17 @@
   number = {4},
   pages = {2937--2951},
   volume = {540}
+}
+
+@article{Ray2025GW231123Extreme,
+  author = {Ray, Anarya and Banagiri, Sharan and Thrane, Eric and Lasky, Paul D.},
+  title = {GW231123: extreme spins or microglitches?},
+  archiveprefix = {arXiv},
+  eprint = {2510.07228},
+  primaryclass = {gr-qc},
+  year = {2025},
+  month = {10},
+  reportnumber = {LIGO-P2500613}
 }
 
 @inproceedings{Roy2025ProbingGravitational,

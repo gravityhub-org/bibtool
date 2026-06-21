@@ -10,6 +10,7 @@ from bibtool.bibtex import (
     BibEntry,
     assign_generated_key,
     enrich_entry_from_metadata,
+    entry_needs_metadata_enrichment,
     merge_entry_fields,
     normalize_for_match,
     normalize_inspire_entry,
@@ -167,6 +168,30 @@ class BibtexTests(unittest.TestCase):
 
         self.assertEqual(merged.fields["journal"], "Phys. Rev. D")
         self.assertEqual(merged.fields["eprint"], "1410.3852")
+
+    def test_entry_needs_metadata_enrichment(self) -> None:
+        self.assertTrue(
+            entry_needs_metadata_enrichment(
+                BibEntry(
+                    entry_type="article",
+                    key="Preprint",
+                    fields={"journal": "arXiv", "eprint": "1234.5678"},
+                )
+            )
+        )
+        self.assertFalse(
+            entry_needs_metadata_enrichment(
+                BibEntry(
+                    entry_type="article",
+                    key="Published",
+                    fields={
+                        "journal": "Phys. Rev. D",
+                        "doi": "10.1/example",
+                        "pages": "123",
+                    },
+                )
+            )
+        )
 
 
 if __name__ == "__main__":

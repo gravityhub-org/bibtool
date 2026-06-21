@@ -107,6 +107,17 @@ def is_arxiv_journal(value: str) -> bool:
     return normalized in {"arxiv", "ar xiv"}
 
 
+def entry_needs_metadata_enrichment(entry: BibEntry) -> bool:
+    journal = strip_outer_wrappers(entry.fields.get("journal", ""))
+    if not journal or is_arxiv_journal(journal):
+        return True
+    if not strip_outer_wrappers(entry.fields.get("doi", "")):
+        return True
+    if entry.entry_type == "article" and not strip_outer_wrappers(entry.fields.get("pages", "")):
+        return True
+    return False
+
+
 def format_inspire_journal_title(value: str) -> str:
     title = strip_outer_wrappers(value)
     if not title:

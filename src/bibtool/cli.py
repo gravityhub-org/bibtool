@@ -144,7 +144,11 @@ def _run_update(
     parser.add_argument("target", nargs="?")
     parser.add_argument("--bib", dest="bib_path")
     parser.add_argument("--y", action="store_true", dest="yes")
+    parser.add_argument("--workers", type=int, default=8, help="parallel INSPIRE requests (default: 8)")
     args = parser.parse_args(list(argv))
+
+    if args.workers < 1:
+        raise CliError("--workers must be at least 1.")
 
     if args.bib_path and args.target:
         raise CliError("Use either a positional bibliography path or --bib, not both.")
@@ -164,7 +168,7 @@ def _run_update(
         stdout.write(f"No entries to update in {target_path}.\n")
         return 0
 
-    merged, updated, skipped = _refresh_entries(existing, provider)
+    merged, updated, skipped = _refresh_entries(existing, provider, workers=args.workers)
 
     if not updated:
         stdout.write(f"No entries updated in {target_path}.\n")
@@ -189,13 +193,20 @@ def _run_update(
 def _refresh_entries(
     existing: list[BibEntry],
     provider: InspireClient,
+    *,
+    workers: int = 8,
 ) -> tuple[list[BibEntry], list[BibEntry], list[str]]:
     merged: list[BibEntry] = []
     updated: list[BibEntry] = []
     skipped: list[str] = []
 
-    for entry in existing:
-        refreshed = provider.refresh_entry(entry)
+    refresh = getattr(provider, "refresh_entries", None)
+    if callable(refresh):
+        refreshed_list = refresh(existing, workers=workers)
+    else:
+        refreshed_list = [provider.refresh_entry(entry) for entry in existing]
+
+    for entry, refreshed in zip(existing, refreshed_list, strict=True):
         if refreshed is None:
             skipped.append(entry.key)
             merged.append(entry.clone())
@@ -426,7 +437,7 @@ _bibtool_completion() {
     cword=${COMP_CWORD}
     root_opts="search update --bib --query --name --title --y --print-completion --install-completion -h --help"
     search_opts="--name --title --limit -h --help"
-    update_opts="--bib --y -h --help"
+    update_opts="--bib --y --workers -h --help"
 
     case "${prev}" in
         --bib)
