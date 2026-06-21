@@ -11,7 +11,8 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from bibtool.cli import run
-from bibtool.inspire import InspireClient, SearchResult
+from bibtool.bibtex import BibEntry
+from bibtool.inspire import InspireClient, SearchResult, clear_response_caches
 
 
 class TtyStringIO(io.StringIO):
@@ -39,6 +40,7 @@ class StubProvider:
         title_entries=None,
         author_results=None,
         title_results=None,
+        catalog=None,
     ) -> None:
         self.query_entries = query_entries or []
         self.author_entries = author_entries if author_entries is not None else list(self.query_entries)
@@ -46,58 +48,94 @@ class StubProvider:
         self.query_results = query_results or []
         self.author_results = author_results if author_results is not None else list(self.query_results)
         self.title_results = title_results if title_results is not None else list(self.query_results)
+        if catalog is not None:
+            self.catalog = catalog
+        else:
+            self.catalog = self._build_catalog()
+        self.lookup_calls: list[tuple[str | None, str | None, str | None, int | None, bool]] = []
         self.seen_queries: list[tuple[str, int | None]] = []
         self.seen_name_title_queries: list[tuple[str, str, int | None]] = []
         self.fetch_calls: list[tuple[str, str]] = []
 
-    def fetch_query_entries(self, query: str):
+    def _build_catalog(self) -> list[tuple[int, BibEntry]]:
+        catalog: list[tuple[int, BibEntry]] = []
+        seen_recids: set[int] = set()
+        seen_keys: set[str] = set()
+        recid = 1
+        for entry in [*self.query_entries, *self.author_entries, *self.title_entries]:
+            if entry.key in seen_keys:
+                continue
+            seen_keys.add(entry.key)
+            catalog.append((recid, entry))
+            seen_recids.add(recid)
+            recid += 1
+        for result in [*self.query_results, *self.author_results, *self.title_results]:
+            if result.recid in seen_recids:
+                continue
+            seen_recids.add(result.recid)
+            catalog.append((result.recid, _result_to_entry(result)))
+        return catalog
+
+    def lookup(
+        self,
+        *,
+        query: str | None = None,
+        name: str | None = None,
+        title: str | None = None,
+        limit: int | None = 20,
+        as_entries: bool = False,
+    ):
+        self.lookup_calls.append((query, name, title, limit, as_entries))
+        spec = InspireClient().resolve_lookup(query=query, name=name, title=title)
+        matched: list[tuple[int, BibEntry]] = []
+        seen_recids: set[int] = set()
+        for recid, entry in self.catalog:
+            if recid in seen_recids:
+                continue
+            if spec.entry_matcher(entry):
+                seen_recids.add(recid)
+                matched.append((recid, entry))
+        if limit is not None:
+            matched = matched[:limit]
+        if as_entries:
+            return [entry for _recid, entry in matched]
+        return [
+            SearchResult(
+                recid=recid,
+                title=entry.title,
+                authors=[part.strip() for part in entry.author.split(" and ") if part.strip()],
+                year=entry.year,
+            )
+            for recid, entry in matched
+        ]
+
+    def fetch_query_entries(self, query: str, limit: int | None = None):
         self.fetch_calls.append(("query", query))
-        self.seen_queries.append((query, None))
-        return list(self.query_entries)
+        return self.lookup(query=query, limit=limit, as_entries=True)
 
     def search(self, query: str, limit: int | None = 20):
         self.seen_queries.append((query, limit))
-        results = list(self.query_results)
-        return results if limit is None else results[:limit]
+        return self.lookup(query=query, limit=limit, as_entries=False)
 
-    def fetch_author_entries(self, query: str):
+    def fetch_author_entries(self, query: str, limit: int | None = None):
         self.fetch_calls.append(("author", query))
-        return list(self.author_entries)
+        return self.lookup(name=query, limit=limit, as_entries=True)
 
-    def fetch_title_entries(self, query: str):
+    def fetch_title_entries(self, query: str, limit: int | None = None):
         self.fetch_calls.append(("title", query))
-        return list(self.title_entries)
+        return self.lookup(title=query, limit=limit, as_entries=True)
 
     def search_author(self, query: str, limit: int | None = 20):
         self.seen_queries.append((query, limit))
-        results = list(self.author_results)
-        return results if limit is None else results[:limit]
+        return self.lookup(name=query, limit=limit, as_entries=False)
 
     def search_title(self, query: str, limit: int | None = 20):
         self.seen_queries.append((query, limit))
-        results = list(self.title_results)
-        return results if limit is None else results[:limit]
+        return self.lookup(title=query, limit=limit, as_entries=False)
 
     def search_name_and_title(self, name: str, title: str, limit: int | None = 20):
-        from bibtool.inspire import _normalized_words, _text_contains_all_words
-
         self.seen_name_title_queries.append((name, title, limit))
-        name_words = _normalized_words(name)
-        title_words = _normalized_words(title)
-        results = [
-            result
-            for result in self.author_results
-            if any(_text_contains_all_words(author, name_words) for author in result.authors)
-            and _text_contains_all_words(result.title, title_words)
-        ]
-        deduped: list[SearchResult] = []
-        seen: set[int] = set()
-        for result in results:
-            if result.recid in seen:
-                continue
-            seen.add(result.recid)
-            deduped.append(result)
-        return deduped if limit is None else deduped[:limit]
+        return self.lookup(name=name, title=title, limit=limit, as_entries=False)
 
 
 class BibtoolCliTests(unittest.TestCase):
@@ -196,7 +234,7 @@ class BibtoolCliTests(unittest.TestCase):
             self.assertIn("@article{KeepThisKey,", content)
             self.assertIn("@article{Hannuksela2024GWTC5Methods,", content)
             self.assertEqual(content.count("GWTC-5 Overview"), 1)
-            self.assertIn(("query", "GWTC-5"), provider.fetch_calls)
+            self.assertEqual(provider.lookup_calls[0], ("GWTC-5", None, None, None, True))
 
     def test_import_defaults_to_template_references_bib(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -251,7 +289,7 @@ class BibtoolCliTests(unittest.TestCase):
             target = Path(tmp) / "references.bib"
             provider = StubProvider(
                 author_entries=[
-                    _entry("AuthorKey", author="Hannuksela, Otto", title="Author Result", year="2024"),
+                    _entry("AuthorKey", author="Hannuksela, Otto", title="GWTC-5 Result", year="2024"),
                 ],
                 title_entries=[
                     _entry("TitleKey", author="Cornish, Neil", title="GWTC-5 Result", year="2025"),
@@ -268,10 +306,9 @@ class BibtoolCliTests(unittest.TestCase):
 
             self.assertEqual(exit_code, 0)
             content = target.read_text(encoding="utf-8")
-            self.assertIn("@article{Hannuksela2024AuthorResult,", content)
-            self.assertIn("@article{Cornish2025GWTC5Result,", content)
-            self.assertIn(("author", "Otto Hannuksela"), provider.fetch_calls)
-            self.assertIn(("title", "GWTC-5"), provider.fetch_calls)
+            self.assertIn("@article{Hannuksela2024GWTC5Result,", content)
+            self.assertNotIn("Cornish2025GWTC5Result", content)
+            self.assertEqual(provider.lookup_calls[0][:4], (None, "Otto Hannuksela", "GWTC-5", None))
 
     def test_import_requires_template_dir_when_bib_not_given(self) -> None:
         provider = StubProvider(query_entries=[_entry("RemoteKey", author="Hannuksela, Otto", title="GWTC-5 Methods", year="2024")])
@@ -334,7 +371,7 @@ class BibtoolCliTests(unittest.TestCase):
             self.assertTrue(target.exists())
             self.assertIn("Continue? [y/N]:", stdout.getvalue())
             self.assertEqual(target.read_text(encoding="utf-8").count("@article{"), 11)
-            self.assertIn(("author", "Otto Hannuksela"), provider.fetch_calls)
+            self.assertEqual(provider.lookup_calls[0][:4], (None, "Otto Hannuksela", None, None))
 
     def test_large_import_skips_confirmation_with_y_flag(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -436,23 +473,19 @@ class BibtoolCliTests(unittest.TestCase):
         )
 
         self.assertEqual(exit_code, 0)
-        self.assertIn(("GWTC-5 Hannuksela", 20), provider.seen_queries)
+        self.assertEqual(provider.lookup_calls[0], ("GWTC-5 Hannuksela", None, None, 20, False))
         self.assertIn("GWTC-5 Methods", stdout.getvalue())
 
     def test_search_allows_name_and_title_together(self) -> None:
         provider = StubProvider(
-            author_results=[
-                SearchResult(
-                    recid=301,
-                    title="GWTC-5 Author Match",
-                    authors=["Hannuksela, Otto"],
-                    year="2024",
+            catalog=[
+                (
+                    301,
+                    _entry("AuthorKey", author="Hannuksela, Otto", title="GWTC-5 Author Match", year="2024"),
                 ),
-                SearchResult(
-                    recid=999,
-                    title="Wrong Title",
-                    authors=["Hannuksela, Otto"],
-                    year="2022",
+                (
+                    999,
+                    _entry("WrongKey", author="Hannuksela, Otto", title="Wrong Title", year="2022"),
                 ),
             ],
         )
@@ -466,19 +499,14 @@ class BibtoolCliTests(unittest.TestCase):
         )
 
         self.assertEqual(exit_code, 0)
-        self.assertEqual(provider.seen_name_title_queries, [("Otto Hannuksela", "GWTC-5", 20)])
+        self.assertEqual(provider.lookup_calls[0][:4], (None, "Otto Hannuksela", "GWTC-5", 20))
         self.assertIn("GWTC-5 Author Match", stdout.getvalue())
         self.assertNotIn("Wrong Title", stdout.getvalue())
 
     def test_search_dedupes_combined_name_and_title_results(self) -> None:
-        shared = SearchResult(
-            recid=401,
-            title="Shared Match",
-            authors=["Hannuksela, Otto"],
-            year="2024",
-        )
+        shared = _entry("SharedKey", author="Hannuksela, Otto", title="Shared Match", year="2024")
         provider = StubProvider(
-            author_results=[shared, shared],
+            catalog=[(401, shared), (401, shared)],
         )
 
         stdout = io.StringIO()
@@ -494,18 +522,19 @@ class BibtoolCliTests(unittest.TestCase):
 
     def test_search_name_and_title_matches_bayesian_substring(self) -> None:
         provider = StubProvider(
-            author_results=[
-                SearchResult(
-                    recid=2738695,
-                    title="Bayesian power spectral estimation of gravitational wave detector noise",
-                    authors=["Gupta, Toral", "Cornish, Neil J."],
-                    year="2024",
+            catalog=[
+                (
+                    2738695,
+                    _entry(
+                        "BayesKey",
+                        author="Gupta, Toral and Cornish, Neil J.",
+                        title="Bayesian power spectral estimation of gravitational wave detector noise",
+                        year="2024",
+                    ),
                 ),
-                SearchResult(
-                    recid=501,
-                    title="A Paper Without Keyword",
-                    authors=["Cornish, Neil"],
-                    year="2024",
+                (
+                    501,
+                    _entry("OtherKey", author="Cornish, Neil", title="A Paper Without Keyword", year="2024"),
                 ),
             ],
         )
@@ -550,7 +579,7 @@ class BibtoolCliTests(unittest.TestCase):
             )
 
         self.assertEqual(exit_code, 0)
-        self.assertIn(("title", "GWTC-5"), provider.fetch_calls)
+        self.assertEqual(provider.lookup_calls[0], (None, None, "GWTC-5", None, True))
 
     def test_print_completion_outputs_bash_script(self) -> None:
         stdout = io.StringIO()
@@ -639,6 +668,18 @@ def _entry(key: str, *, author: str, title: str, year: str):
             "author": author,
             "title": title,
             "year": year,
+        },
+    )
+
+
+def _result_to_entry(result: SearchResult) -> BibEntry:
+    return BibEntry(
+        entry_type="article",
+        key=f"Rec{result.recid}",
+        fields={
+            "author": " and ".join(result.authors),
+            "title": result.title,
+            "year": result.year,
         },
     )
 

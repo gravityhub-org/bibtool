@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from bibtool.bibtex import BibEntry
 from bibtool.cli import _merge_entries, run
-from bibtool.inspire import InspireClient, SearchResult
+from bibtool.inspire import InspireClient, SearchResult, clear_response_caches
 
 
 class MergeBehaviorTests(unittest.TestCase):
@@ -142,6 +142,9 @@ class CliFailurePathTests(unittest.TestCase):
 
 
 class InspireBehaviorTests(unittest.TestCase):
+    def setUp(self) -> None:
+        clear_response_caches()
+
     def test_search_filters_case_insensitively_across_authors(self) -> None:
         client = FakeInspireClient(
             pages=[
@@ -231,9 +234,6 @@ class InspireBehaviorTests(unittest.TestCase):
         self.assertEqual(len(client.requested_urls), 2)
 
     def test_request_json_is_cached(self) -> None:
-        from bibtool.inspire import _JSON_CACHE
-
-        _JSON_CACHE.clear()
         payload = _search_page(
             _search_hit(recid=1, title="Bayesian paper", author="Cornish, Neil J.", year="2024"),
         )
@@ -250,38 +250,63 @@ class InspireBehaviorTests(unittest.TestCase):
 
         client = InspireClient(base_url="https://example.test/api/literature", timeout=1.0)
         with patch("bibtool.inspire.urlopen", return_value=Response(json.dumps(payload))) as mock_urlopen:
-            first = client.search_name_and_title("Neil Cornish", "Bayes", limit=1)
-            second = client.search_name_and_title("Neil Cornish", "Bayes", limit=1)
+            client.lookup(name="Neil Cornish", title="Bayes", limit=1, as_entries=False)
+            client.lookup(name="Neil Cornish", title="Bayes", limit=1, as_entries=False)
 
-        self.assertEqual([result.recid for result in first], [1])
-        self.assertEqual([result.recid for result in second], [1])
         self.assertEqual(mock_urlopen.call_count, 1)
 
     def test_fetch_query_entries_fetches_bibtex_for_each_match(self) -> None:
-        client = BibtexPagingFakeInspireClient(
-            bodies=[
-                """@article{Fetched3,\n  author = {Hannuksela, Otto},\n  title = {GWTC-5 Methods},\n  year = {2025}\n}\n\n@article{Fetched4,\n  author = {Hannuksela, Otto},\n  title = {GWTC-5 Results},\n  year = {2025}\n}\n""",
-                "",
-            ]
+        client = RecordingLookupClient(
+            pages=[
+                _search_page(
+                    _search_hit(recid=3, title="GWTC-5 Methods", author="Hannuksela, Otto", year="2025"),
+                    _search_hit(recid=4, title="GWTC-5 Results", author="Hannuksela, Otto", year="2025"),
+                )
+            ],
+            bibtex_by_recid={
+                3: """@article{Fetched3,
+  author = {Hannuksela, Otto},
+  title = {GWTC-5 Methods},
+  year = {2025}
+}
+""",
+                4: """@article{Fetched4,
+  author = {Hannuksela, Otto},
+  title = {GWTC-5 Results},
+  year = {2025}
+}
+""",
+            },
         )
 
         entries = client.fetch_query_entries("GWTC-5")
 
         self.assertEqual([entry.key for entry in entries], ["Fetched3", "Fetched4"])
-        self.assertEqual(len(client.requested_text_urls), 1)
-        self.assertIn("format=bibtex", client.requested_text_urls[0])
+        self.assertEqual(client.json_requests, 1)
+        self.assertEqual(client.text_requests, 2)
+        self.assertIn("format=bibtex", client.requested_urls[-1])
 
     def test_fetch_author_entries_uses_author_only_query(self) -> None:
-        client = BibtexPagingFakeInspireClient(
-            bodies=[
-                """@article{Fetched3,\n  author = {Hannuksela, Otto Akseli},\n  title = {Lensing Methods},\n  year = {2025}\n}\n""",
-            ]
+        client = RecordingLookupClient(
+            pages=[
+                _search_page(
+                    _search_hit(recid=3, title="Lensing Methods", author="Hannuksela, Otto Akseli", year="2025"),
+                )
+            ],
+            bibtex_by_recid={
+                3: """@article{Fetched3,
+  author = {Hannuksela, Otto Akseli},
+  title = {Lensing Methods},
+  year = {2025}
+}
+""",
+            },
         )
 
         entries = client.fetch_author_entries("Otto Hannuksela")
 
         self.assertEqual([entry.key for entry in entries], ["Fetched3"])
-        self.assertIn("q=author%3A%22Otto%22+and+author%3A%22Hannuksela%22", client.requested_text_urls[0])
+        self.assertIn("q=author%3A%22Otto%22+and+author%3A%22Hannuksela%22", client.requested_urls[0])
 
 
 class TtyStringIO(io.StringIO):
@@ -291,13 +316,67 @@ class TtyStringIO(io.StringIO):
 
 class StubProvider:
     def __init__(self, *, query_entries=None) -> None:
-        self.query_entries = query_entries or []
+        self.catalog = [
+            (index + 1, entry)
+            for index, entry in enumerate(query_entries or [])
+        ]
 
-    def fetch_query_entries(self, query: str):
-        return list(self.query_entries)
+    def lookup(self, *, query=None, name=None, title=None, limit=20, as_entries=False):
+        spec = InspireClient().resolve_lookup(query=query, name=name, title=title)
+        matched: list[tuple[int, BibEntry]] = []
+        seen_recids: set[int] = set()
+        for recid, entry in self.catalog:
+            if recid in seen_recids:
+                continue
+            if spec.entry_matcher(entry):
+                seen_recids.add(recid)
+                matched.append((recid, entry))
+        if limit is not None:
+            matched = matched[:limit]
+        if as_entries:
+            return [entry for _recid, entry in matched]
+        return [
+            SearchResult(
+                recid=recid,
+                title=entry.title,
+                authors=[part.strip() for part in entry.author.split(" and ") if part.strip()],
+                year=entry.year,
+            )
+            for recid, entry in matched
+        ]
 
-    def fetch_author_entries(self, query: str):
-        return self.fetch_query_entries(query)
+
+class RecordingLookupClient(InspireClient):
+    def __init__(self, *, pages, bibtex_by_recid: dict[int, str]) -> None:
+        super().__init__(base_url="https://example.test/api/literature", timeout=1.0)
+        self.pages = list(pages)
+        self.bibtex_by_recid = bibtex_by_recid
+        self.requested_urls: list[str] = []
+        self.json_requests = 0
+        self.text_requests = 0
+
+    def _request_json(self, url: str):
+        from bibtool import inspire as inspire_module
+
+        self.requested_urls.append(url)
+        if url not in inspire_module._JSON_CACHE:
+            self.json_requests += 1
+            inspire_module._JSON_CACHE[url] = self.pages.pop(0) if self.pages else {"hits": {"hits": []}}
+        return inspire_module._JSON_CACHE[url]
+
+    def _request_text(self, url: str) -> str:
+        from bibtool import inspire as inspire_module
+
+        self.requested_urls.append(url)
+        if url in inspire_module._TEXT_CACHE:
+            return inspire_module._TEXT_CACHE[url]
+        self.text_requests += 1
+        if "?format=bibtex" in url:
+            recid = int(url.rsplit("/", 1)[-1].split("?", 1)[0])
+            body = self.bibtex_by_recid.get(recid, "")
+            inspire_module._TEXT_CACHE[url] = body
+            return body
+        return ""
 
 
 class FakeInspireClient(InspireClient):
@@ -319,17 +398,6 @@ class FetchingFakeInspireClient(FakeInspireClient):
     def fetch_entry(self, recid: int) -> BibEntry:
         self.fetched_recids.append(recid)
         return _entry(f"Fetched{recid}", author="Hannuksela, Otto", title=f"Fetched {recid}", year="2025")
-
-
-class BibtexPagingFakeInspireClient(InspireClient):
-    def __init__(self, *, bodies) -> None:
-        super().__init__(base_url="https://example.test/api/literature", timeout=1.0)
-        self.bodies = list(bodies)
-        self.requested_text_urls: list[str] = []
-
-    def _request_text(self, url: str) -> str:
-        self.requested_text_urls.append(url)
-        return self.bodies.pop(0) if self.bodies else ""
 
 
 def _entry(key: str, *, author: str, title: str, year: str, doi: str | None = None, eprint: str | None = None) -> BibEntry:

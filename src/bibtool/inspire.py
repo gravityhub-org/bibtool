@@ -18,6 +18,11 @@ _JSON_CACHE: dict[str, Any] = {}
 _TEXT_CACHE: dict[str, str] = {}
 
 
+def clear_response_caches() -> None:
+    _JSON_CACHE.clear()
+    _TEXT_CACHE.clear()
+
+
 @dataclass(slots=True)
 class SearchResult:
     recid: int
@@ -31,63 +36,99 @@ class SearchResult:
         return self.authors[0] if self.authors else ""
 
 
+@dataclass(frozen=True, slots=True)
+class LookupSpec:
+    query: str
+    result_matcher: Callable[[SearchResult], bool]
+    entry_matcher: Callable[[BibEntry], bool]
+
+
 class InspireClient:
     def __init__(self, base_url: str = "https://inspirehep.net/api/literature", timeout: float = 10.0) -> None:
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
 
-    def fetch_query_entries(self, query: str) -> list[BibEntry]:
-        query_words = _normalized_words(query)
-        return self._fetch_bibtex_entries(
-            self._keyword_query(query),
-            matcher=lambda entry: _entry_contains_all_words(entry, query_words, include_author=True, include_title=True),
-        )
+    def lookup(
+        self,
+        *,
+        query: str | None = None,
+        name: str | None = None,
+        title: str | None = None,
+        limit: int | None = 20,
+        as_entries: bool = False,
+    ) -> list[SearchResult] | list[BibEntry]:
+        spec = self.resolve_lookup(query=query, name=name, title=title)
+        results = self._search_records(spec.query, matcher=spec.result_matcher, limit=limit)
+        if not as_entries:
+            return results
+        return [self.fetch_entry(result.recid) for result in results]
 
-    def fetch_author_entries(self, query: str) -> list[BibEntry]:
-        return self._fetch_bibtex_entries(
-            self._author_query(query),
-        )
+    def resolve_lookup(
+        self,
+        *,
+        query: str | None = None,
+        name: str | None = None,
+        title: str | None = None,
+    ) -> LookupSpec:
+        if query is not None:
+            words = _normalized_words(query)
+            return LookupSpec(
+                query=self._keyword_query(query),
+                result_matcher=lambda result: _result_contains_all_words(result, words),
+                entry_matcher=lambda entry: _entry_contains_all_words(
+                    entry,
+                    words,
+                    include_author=True,
+                    include_title=True,
+                ),
+            )
+        if name is not None and title is not None:
+            name_words = _normalized_words(name)
+            title_words = _normalized_words(title)
+            return LookupSpec(
+                query=self._name_title_query(name, title),
+                result_matcher=lambda result: _matches_name_and_title(result, name_words, title_words),
+                entry_matcher=lambda entry: _entry_matches_name_and_title(entry, name_words, title_words),
+            )
+        if name is not None:
+            words = _normalized_words(name)
+            return LookupSpec(
+                query=self._author_query(name),
+                result_matcher=lambda result: any(_text_contains_all_words(author, words) for author in result.authors),
+                entry_matcher=lambda entry: _text_contains_all_words(entry.author, words),
+            )
+        if title is not None:
+            words = _normalized_words(title)
+            return LookupSpec(
+                query=self._title_wildcard_query(title),
+                result_matcher=lambda result: _text_contains_all_words(result.title, words),
+                entry_matcher=lambda entry: _text_contains_all_words(entry.title, words),
+            )
+        raise InspireError("Search query cannot be empty.")
 
-    def fetch_title_entries(self, query: str) -> list[BibEntry]:
-        return self._fetch_bibtex_entries(
-            self._title_query(query),
-        )
+    def fetch_query_entries(self, query: str, limit: int | None = None) -> list[BibEntry]:
+        return self.lookup(query=query, limit=limit, as_entries=True)
+
+    def fetch_author_entries(self, query: str, limit: int | None = None) -> list[BibEntry]:
+        return self.lookup(name=query, limit=limit, as_entries=True)
+
+    def fetch_title_entries(self, query: str, limit: int | None = None) -> list[BibEntry]:
+        return self.lookup(title=query, limit=limit, as_entries=True)
+
+    def fetch_name_and_title_entries(self, name: str, title: str, limit: int | None = None) -> list[BibEntry]:
+        return self.lookup(name=name, title=title, limit=limit, as_entries=True)
 
     def search(self, query: str, limit: int | None = 20) -> list[SearchResult]:
-        normalized_query_words = _normalized_words(query)
-        return self._search_records(
-            self._keyword_query(query),
-            matcher=lambda result: _result_contains_all_words(result, normalized_query_words),
-            limit=limit,
-        )
+        return self.lookup(query=query, limit=limit, as_entries=False)
 
     def search_title(self, query: str, limit: int | None = 20) -> list[SearchResult]:
-        normalized_query_words = _normalized_words(query)
-        return self._search_records(
-            self._title_query(query),
-            matcher=lambda result: _text_contains_all_words(result.title, normalized_query_words),
-            limit=limit,
-        )
+        return self.lookup(title=query, limit=limit, as_entries=False)
 
     def search_author(self, query: str, limit: int | None = 20) -> list[SearchResult]:
-        normalized_query_words = _normalized_words(query)
-        return self._search_records(
-            self._author_query(query),
-            matcher=lambda result: any(_text_contains_all_words(author, normalized_query_words) for author in result.authors),
-            limit=limit,
-        )
+        return self.lookup(name=query, limit=limit, as_entries=False)
 
     def search_name_and_title(self, name: str, title: str, limit: int | None = 20) -> list[SearchResult]:
-        name_words = _normalized_words(name)
-        title_words = _normalized_words(title)
-        return self._search_records(
-            self._name_title_query(name, title),
-            matcher=lambda result: (
-                any(_text_contains_all_words(author, name_words) for author in result.authors)
-                and _text_contains_all_words(result.title, title_words)
-            ),
-            limit=limit,
-        )
+        return self.lookup(name=name, title=title, limit=limit, as_entries=False)
 
     def fetch_entry(self, recid: int) -> BibEntry:
         body = self._request_text(f"{self.base_url}/{recid}?format=bibtex")
@@ -95,36 +136,6 @@ class InspireClient:
         if not entries:
             raise InspireError(f"INSPIRE returned no BibTeX for record {recid}.")
         return entries[0]
-
-    def _fetch_bibtex_entries(
-        self,
-        query: str,
-        *,
-        matcher: Callable[[BibEntry], bool] | None = None,
-    ) -> list[BibEntry]:
-        entries: list[BibEntry] = []
-        page = 1
-        page_size = 50
-        while page <= 10:
-            params = urlencode(
-                {
-                    "q": query,
-                    "page": page,
-                    "size": page_size,
-                    "sort": "mostrecent",
-                    "format": "bibtex",
-                }
-            )
-            body = self._request_text(f"{self.base_url}/?{params}")
-            parsed_entries = parse_bibtex(body)
-            page_entries = [entry for entry in parsed_entries if matcher(entry)] if matcher is not None else parsed_entries
-            if not page_entries:
-                break
-            entries.extend(page_entries)
-            if len(parsed_entries) < page_size:
-                break
-            page += 1
-        return entries
 
     def _search_records(
         self,
@@ -185,11 +196,11 @@ class InspireClient:
             raise InspireError("Search query cannot be empty.")
         return " and ".join(f'author:"{_escape_query_token(token)}"' for token in tokens)
 
-    def _title_query(self, query: str) -> str:
+    def _title_wildcard_query(self, query: str) -> str:
         tokens = _query_tokens(query)
         if not tokens:
             raise InspireError("Search query cannot be empty.")
-        return " and ".join(f'title:"{_escape_query_token(token)}"' for token in tokens)
+        return " and ".join(f"title:{_escape_query_token(token)}*" for token in tokens)
 
     def _name_title_query(self, name: str, title: str) -> str:
         title_tokens = _query_tokens(title)
@@ -280,6 +291,17 @@ def _normalized_words(value: str) -> list[str]:
 
 def _query_tokens(value: str) -> list[str]:
     return [token for token in value.split() if token.strip()]
+
+
+def _matches_name_and_title(result: SearchResult, name_words: list[str], title_words: list[str]) -> bool:
+    return any(_text_contains_all_words(author, name_words) for author in result.authors) and _text_contains_all_words(
+        result.title,
+        title_words,
+    )
+
+
+def _entry_matches_name_and_title(entry: BibEntry, name_words: list[str], title_words: list[str]) -> bool:
+    return _text_contains_all_words(entry.author, name_words) and _text_contains_all_words(entry.title, title_words)
 
 
 def _result_contains_all_words(result: SearchResult, required_words: list[str]) -> bool:

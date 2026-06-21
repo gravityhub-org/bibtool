@@ -93,26 +93,25 @@ def _run_default(
         if args.query and (args.name or args.title):
             raise CliError("Use --query by itself, or combine --name and --title.")
 
-        incoming: list[BibEntry] = []
-        origins: list[str] = []
-        if args.query:
-            query = " ".join(args.query)
-            incoming.extend(provider.fetch_query_entries(query))
-            origins.append(f'INSPIRE query "{query}"')
-        if args.name:
-            query = " ".join(args.name)
-            incoming.extend(provider.fetch_author_entries(query))
-            origins.append(f'INSPIRE author "{query}"')
-        if args.title:
-            query = " ".join(args.title)
-            incoming.extend(provider.fetch_title_entries(query))
-            origins.append(f'INSPIRE title "{query}"')
+        query = " ".join(args.query) if args.query else None
+        name = " ".join(args.name) if args.name else None
+        title = " ".join(args.title) if args.title else None
+        incoming = list(
+            provider.lookup(
+                query=query,
+                name=name,
+                title=title,
+                limit=None,
+                as_entries=True,
+            )
+        )
+        origin = _lookup_origin(query=query, name=name, title=title)
         return _add_entries(
             target_path=target_path,
             incoming=incoming,
             stdin=stdin,
             stdout=stdout,
-            origin=" + ".join(origins),
+            origin=origin,
             auto_confirm=args.yes,
         )
 
@@ -132,25 +131,19 @@ def _run_search(argv: Sequence[str], *, stdout: TextIO, provider: InspireClient)
     if args.query and (args.name or args.title):
         raise CliError("Use either positional search terms or --name/--title, not both.")
 
-    results: list = []
-    if args.query:
-        query = " ".join(args.query)
-        if not query:
-            raise CliError("Search query cannot be empty.")
-        results = provider.search(query, limit=args.limit)
-    else:
-        if not args.name and not args.title:
-            raise CliError("Search query cannot be empty.")
-        if args.name and args.title:
-            results = provider.search_name_and_title(
-                " ".join(args.name),
-                " ".join(args.title),
-                limit=args.limit,
-            )
-        elif args.name:
-            results = provider.search_author(" ".join(args.name), limit=args.limit)
-        else:
-            results = provider.search_title(" ".join(args.title), limit=args.limit)
+    query = " ".join(args.query) if args.query else None
+    name = " ".join(args.name) if args.name else None
+    title = " ".join(args.title) if args.title else None
+    if not query and not name and not title:
+        raise CliError("Search query cannot be empty.")
+
+    results = provider.lookup(
+        query=query,
+        name=name,
+        title=title,
+        limit=args.limit,
+        as_entries=False,
+    )
 
     if not results:
         stdout.write("No matching records found.\n")
@@ -167,6 +160,16 @@ def _run_search(argv: Sequence[str], *, stdout: TextIO, provider: InspireClient)
 
 def _terminal_link(text: str, url: str) -> str:
     return f"\033]8;;{url}\033\\{text}\033]8;;\033\\"
+
+
+def _lookup_origin(*, query: str | None, name: str | None, title: str | None) -> str:
+    if query is not None:
+        return f'INSPIRE query "{query}"'
+    if name is not None and title is not None:
+        return f'INSPIRE author "{name}" and title "{title}"'
+    if name is not None:
+        return f'INSPIRE author "{name}"'
+    return f'INSPIRE title "{title}"'
 
 
 def _default_import_target_path(bib_path: str | None) -> Path:
