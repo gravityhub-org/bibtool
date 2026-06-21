@@ -143,7 +143,6 @@ def _run_update(
     parser = argparse.ArgumentParser(prog="bibtool update")
     parser.add_argument("target", nargs="?")
     parser.add_argument("--bib", dest="bib_path")
-    parser.add_argument("--y", action="store_true", dest="yes")
     parser.add_argument("--workers", type=int, default=8, help="parallel INSPIRE requests (default: 8)")
     args = parser.parse_args(list(argv))
 
@@ -180,7 +179,7 @@ def _run_update(
         len(updated),
         stdin=stdin,
         stdout=stdout,
-        auto_confirm=args.yes,
+        auto_confirm=True,
         action="update",
     )
     target_path.write_text(write_bibtex(merged), encoding="utf-8")
@@ -437,7 +436,7 @@ _bibtool_completion() {
     cword=${COMP_CWORD}
     root_opts="search update --bib --query --name --title --y --print-completion --install-completion -h --help"
     search_opts="--name --title --limit -h --help"
-    update_opts="--bib --y --workers -h --help"
+    update_opts="--bib --workers -h --help"
 
     case "${prev}" in
         --bib)

@@ -88,7 +88,7 @@ class UpdateCommandTests(unittest.TestCase):
 
             stdout = io.StringIO()
             exit_code = run(
-                ["update", str(target), "--y"],
+                ["update", str(target)],
                 stdin=io.StringIO(),
                 stdout=stdout,
                 stderr=io.StringIO(),
@@ -104,6 +104,52 @@ class UpdateCommandTests(unittest.TestCase):
             self.assertEqual(provider.refresh_calls, ["Ray2025GW231123Extreme", "KeepUnchanged"])
             self.assertIn("Updated 1 entries", stdout.getvalue())
             self.assertIn("Skipped 1 entries", stdout.getvalue())
+
+    def test_update_never_prompts_for_large_batches(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "references.bib"
+            target.write_text(
+                "\n\n".join(
+                    f"""@article{{Entry{index},
+  author = {{Hannuksela, Otto}},
+  title = {{Paper {index}}},
+  eprint = {{{2401:05d}}},
+  year = {{2024}}
+}}"""
+                    for index in range(11)
+                ),
+                encoding="utf-8",
+            )
+
+            provider = UpdateProvider(
+                fresh_by_eprint={
+                    f"{2401:05d}": BibEntry(
+                        entry_type="article",
+                        key="ignored",
+                        fields={
+                            "author": "Hannuksela, Otto",
+                            "title": f"Paper {index}",
+                            "eprint": f"{2401:05d}",
+                            "journal": "arXiv",
+                            "year": "2024",
+                        },
+                    )
+                    for index in range(11)
+                }
+            )
+
+            stdout = io.StringIO()
+            exit_code = run(
+                ["update", str(target)],
+                stdin=io.StringIO(),
+                stdout=stdout,
+                stderr=io.StringIO(),
+                provider=provider,
+            )
+
+            self.assertEqual(exit_code, 0)
+            self.assertNotIn("Continue? [y/N]:", stdout.getvalue())
+            self.assertIn("Updated 11 entries", stdout.getvalue())
 
     def test_update_upgrades_arxiv_preprint_to_published_journal(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -145,7 +191,7 @@ class UpdateCommandTests(unittest.TestCase):
             )
 
             exit_code = run(
-                ["update", str(target), "--y"],
+                ["update", str(target)],
                 stdin=io.StringIO(),
                 stdout=io.StringIO(),
                 stderr=io.StringIO(),
@@ -194,7 +240,7 @@ class UpdateCommandTests(unittest.TestCase):
             os.environ["LATEX_TEMPLATE_DIR"] = str(template_dir)
             try:
                 exit_code = run(
-                    ["update", "--y"],
+                    ["update"],
                     stdin=io.StringIO(),
                     stdout=io.StringIO(),
                     stderr=io.StringIO(),
