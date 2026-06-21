@@ -79,7 +79,7 @@ def _run_default(
 ) -> int:
     parser = argparse.ArgumentParser(prog="bibtool")
     parser.add_argument("target", nargs="?")
-    parser.add_argument("--bib", dest="bib_path", default="references.bib")
+    parser.add_argument("--bib", dest="bib_path")
     parser.add_argument("--y", action="store_true", dest="yes")
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--query", nargs="+")
@@ -91,7 +91,7 @@ def _run_default(
         if args.target:
             raise CliError("Use --bib to choose the output file when importing by query.")
         query = " ".join(args.query or args.name or args.title)
-        target_path = Path(args.bib_path)
+        target_path = _default_import_target_path(args.bib_path)
         if args.name:
             incoming = provider.fetch_author_entries(query)
         elif args.title:
@@ -139,6 +139,16 @@ def _run_search(argv: Sequence[str], *, stdout: TextIO, provider: InspireClient)
         year = result.year or "????"
         stdout.write(f"[{result.recid}] {author} ({year}) {result.title}\n")
     return 0
+
+
+def _default_import_target_path(bib_path: str | None) -> Path:
+    if bib_path:
+        return Path(bib_path)
+
+    template_dir = os.environ.get("LATEX_TEMPLATE_DIR")
+    if not template_dir:
+        raise CliError("LATEX_TEMPLATE_DIR is not set.")
+    return Path(template_dir) / "references.bib"
 
 
 def _merge_template(*, target_path: Path, stdin: TextIO, stdout: TextIO, auto_confirm: bool) -> int:

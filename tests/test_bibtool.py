@@ -159,6 +159,73 @@ class BibtoolCliTests(unittest.TestCase):
             self.assertEqual(content.count("GWTC-5 Overview"), 1)
             self.assertIn(("query", "GWTC-5"), provider.fetch_calls)
 
+    def test_import_defaults_to_template_references_bib(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            template_dir = root / "template"
+            template_dir.mkdir()
+            target = template_dir / "references.bib"
+            target.write_text(
+                """@article{KeepThisKey,
+  author = {Doe, Jane},
+  title = {GWTC-5 Overview},
+  year = {2023}
+}
+""",
+                encoding="utf-8",
+            )
+
+            provider = StubProvider(
+                query_entries=[
+                    _entry(
+                        "RemoteKeyB",
+                        author="Hannuksela, Otto",
+                        title="GWTC-5 Methods",
+                        year="2024",
+                    ),
+                ]
+            )
+
+            original = os.environ.get("LATEX_TEMPLATE_DIR")
+            os.environ["LATEX_TEMPLATE_DIR"] = str(template_dir)
+            try:
+                exit_code = run(
+                    ["--query", "GWTC-5"],
+                    stdin=io.StringIO(),
+                    stdout=io.StringIO(),
+                    stderr=io.StringIO(),
+                    provider=provider,
+                )
+            finally:
+                if original is None:
+                    os.environ.pop("LATEX_TEMPLATE_DIR", None)
+                else:
+                    os.environ["LATEX_TEMPLATE_DIR"] = original
+
+            self.assertEqual(exit_code, 0)
+            content = target.read_text(encoding="utf-8")
+            self.assertIn("@article{KeepThisKey,", content)
+            self.assertIn("@article{Hannuksela2024GWTC5Methods,", content)
+
+    def test_import_requires_template_dir_when_bib_not_given(self) -> None:
+        provider = StubProvider(query_entries=[_entry("RemoteKey", author="Hannuksela, Otto", title="GWTC-5 Methods", year="2024")])
+        original = os.environ.pop("LATEX_TEMPLATE_DIR", None)
+        try:
+            stderr = io.StringIO()
+            exit_code = run(
+                ["--query", "GWTC-5"],
+                stdin=io.StringIO(),
+                stdout=io.StringIO(),
+                stderr=stderr,
+                provider=provider,
+            )
+        finally:
+            if original is not None:
+                os.environ["LATEX_TEMPLATE_DIR"] = original
+
+        self.assertEqual(exit_code, 1)
+        self.assertIn("LATEX_TEMPLATE_DIR is not set", stderr.getvalue())
+
     def test_large_import_requires_two_confirmations(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp) / "references.bib"

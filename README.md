@@ -23,7 +23,7 @@ bibtool --install-completion
 ## Behavior
 
 - `bibtool references.bib` merges `$LATEX_TEMPLATE_DIR/references.bib` into the target file.
-- `--query` imports records into `references.bib` by default, or another file via `--bib`; `--name` and `--title` remain supported aliases.
+- `--query`, `--name`, and `--title` import into `$LATEX_TEMPLATE_DIR/references.bib` by default, or another file via `--bib`.
 - `search` takes plain search terms and queries INSPIRE HEP without modifying files.
 - Search/import use a looser cuhkvoting-style keyword query across title and author, then apply a case-insensitive local AND filter on the returned metadata.
 - Duplicate detection is case-insensitive and checks title, DOI, and eprint rather than only BibTeX keys.
