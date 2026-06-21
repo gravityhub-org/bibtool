@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
+import re
 from typing import Any, Callable
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import urlopen
 
-from .bibtex import BibEntry, parse_bibtex, normalize_for_match
+from .bibtex import BibEntry, first_author_name, merge_entry_fields, normalize_inspire_entry, parse_bibtex, normalize_for_match, strip_outer_wrappers
 
 
 class InspireError(RuntimeError):
@@ -135,7 +136,42 @@ class InspireClient:
         entries = parse_bibtex(body)
         if not entries:
             raise InspireError(f"INSPIRE returned no BibTeX for record {recid}.")
-        return entries[0]
+        return normalize_inspire_entry(entries[0])
+
+    def lookup_recid(self, entry: BibEntry) -> int | None:
+        eprint = strip_outer_wrappers(entry.fields.get("eprint", ""))
+        if eprint:
+            results = self._search_records(f"eprint:{eprint}", matcher=lambda _result: True, limit=1)
+            if results:
+                return results[0].recid
+
+        doi = _normalize_doi(entry.fields.get("doi", ""))
+        if doi:
+            results = self._search_records(f"doi:{doi}", matcher=lambda _result: True, limit=1)
+            if results:
+                return results[0].recid
+
+        author = first_author_name(entry.author)
+        title = strip_outer_wrappers(entry.title)
+        if author and title:
+            results = self.search_name_and_title(author, _title_lookup_terms(title), limit=1)
+            if results:
+                return results[0].recid
+        if title:
+            results = self.search_title(_title_lookup_terms(title), limit=1)
+            if results:
+                return results[0].recid
+        return None
+
+    def refresh_entry(self, entry: BibEntry) -> BibEntry | None:
+        recid = self.lookup_recid(entry)
+        if recid is None:
+            return None
+        fresh = self.fetch_entry(recid)
+        refreshed = merge_entry_fields(entry, fresh)
+        refreshed.key = entry.key
+        refreshed.entry_type = entry.entry_type
+        return refreshed
 
     def _search_records(
         self,
@@ -232,6 +268,18 @@ class InspireClient:
             raise InspireError(f"Unable to fetch BibTeX from INSPIRE: {error}") from error
         _TEXT_CACHE[url] = body
         return body
+
+
+def _normalize_doi(value: str) -> str:
+    doi = strip_outer_wrappers(value)
+    return re.sub(r"^https?://(?:dx\.)?doi\.org/", "", doi, flags=re.IGNORECASE)
+
+
+def _title_lookup_terms(title: str) -> str:
+    words = [word for word in normalize_for_match(title).split() if word and word not in _STOP_WORDS]
+    if not words:
+        words = [word for word in normalize_for_match(title).split() if word]
+    return " ".join(words[:4])
 
 
 def _search_results_from_hits(hits: list[dict[str, Any]]) -> list[SearchResult]:

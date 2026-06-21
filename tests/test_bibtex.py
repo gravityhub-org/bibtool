@@ -6,7 +6,7 @@ import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from bibtool.bibtex import BibEntry, assign_generated_key, normalize_for_match, parse_bibtex, write_bibtex
+from bibtool.bibtex import BibEntry, assign_generated_key, normalize_for_match, normalize_inspire_entry, parse_bibtex, write_bibtex
 
 
 class BibtexTests(unittest.TestCase):
@@ -62,6 +62,42 @@ class BibtexTests(unittest.TestCase):
         self.assertLess(text.index("author"), text.index("title"))
         self.assertLess(text.index("title"), text.index("doi"))
         self.assertLess(text.index("doi"), text.index("year"))
+
+    def test_normalize_inspire_entry_adds_arxiv_journal(self) -> None:
+        entry = normalize_inspire_entry(
+            BibEntry(
+                entry_type="article",
+                key="Ray2025",
+                fields={
+                    "author": "Ray, Anarya",
+                    "title": "GW231123: extreme spins or microglitches?",
+                    "eprint": "2510.07228",
+                    "archiveprefix": "arXiv",
+                    "primaryclass": "gr-qc",
+                    "year": "2025",
+                },
+            )
+        )
+
+        self.assertEqual(entry.fields["journal"], "arXiv")
+
+    def test_normalize_inspire_entry_preserves_existing_journal(self) -> None:
+        entry = normalize_inspire_entry(
+            BibEntry(
+                entry_type="article",
+                key="Published",
+                fields={
+                    "author": "Doe, Jane",
+                    "title": "A Paper",
+                    "journal": "Phys. Rev. D",
+                    "eprint": "2401.00001",
+                    "archiveprefix": "arXiv",
+                    "year": "2024",
+                },
+            )
+        )
+
+        self.assertEqual(entry.fields["journal"], "Phys. Rev. D")
 
 
 if __name__ == "__main__":

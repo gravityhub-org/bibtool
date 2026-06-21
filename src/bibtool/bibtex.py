@@ -88,6 +88,47 @@ def normalize_for_match(value: str) -> str:
     return " ".join(words)
 
 
+def normalize_inspire_entry(entry: BibEntry) -> BibEntry:
+    normalized = entry.clone()
+    if normalized.entry_type != "article":
+        return normalized
+
+    eprint = strip_outer_wrappers(normalized.fields.get("eprint", ""))
+    journal = strip_outer_wrappers(normalized.fields.get("journal", ""))
+    archiveprefix = strip_outer_wrappers(normalized.fields.get("archiveprefix", "")).lower()
+    if eprint and not journal and (not archiveprefix or archiveprefix == "arxiv"):
+        normalized.fields["journal"] = "arXiv"
+    return normalized
+
+
+def merge_entry_fields(existing: BibEntry, incoming: BibEntry) -> BibEntry:
+    merged = existing.clone()
+    for name, value in incoming.fields.items():
+        if strip_outer_wrappers(value):
+            merged.fields[name] = value
+    return merged
+
+
+def entries_equivalent(left: BibEntry, right: BibEntry) -> bool:
+    if left.entry_type != right.entry_type:
+        return False
+    field_names = set(left.fields) | set(right.fields)
+    return all(
+        strip_outer_wrappers(left.fields.get(name, "")) == strip_outer_wrappers(right.fields.get(name, ""))
+        for name in field_names
+    )
+
+
+def find_matching_entry_index(existing: list[BibEntry], incoming: BibEntry) -> int | None:
+    incoming_tokens = dedupe_tokens(incoming)
+    if not incoming_tokens:
+        return None
+    for index, entry in enumerate(existing):
+        if dedupe_tokens(entry) & incoming_tokens:
+            return index
+    return None
+
+
 def dedupe_tokens(entry: BibEntry) -> set[str]:
     tokens: set[str] = set()
     title = normalize_for_match(entry.title)
@@ -256,6 +297,10 @@ def _wrapping_pair(value: str, opener: str, closer: str) -> bool:
             if depth == 0 and index != len(value) - 1:
                 return False
     return depth == 0
+
+
+def first_author_name(author_field: str) -> str:
+    return _first_author(author_field)
 
 
 def _first_author(author_field: str) -> str:

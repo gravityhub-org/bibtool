@@ -18,7 +18,7 @@ from bibtool.inspire import InspireClient, SearchResult, clear_response_caches
 
 class MergeBehaviorTests(unittest.TestCase):
     def test_merge_dedupes_by_doi(self) -> None:
-        merged, added = _merge_entries(
+        merged, added, updated = _merge_entries(
             [
                 _entry("Keep", author="Doe, Jane", title="Original", year="2020", doi="10.1/example"),
             ],
@@ -29,23 +29,36 @@ class MergeBehaviorTests(unittest.TestCase):
 
         self.assertEqual(len(merged), 1)
         self.assertEqual(added, [])
+        self.assertEqual(len(updated), 1)
         self.assertEqual(merged[0].key, "Keep")
+        self.assertEqual(merged[0].author, "Hannuksela, Otto")
+        self.assertEqual(merged[0].title, "Different Title")
+        self.assertEqual(merged[0].year, "2024")
 
     def test_merge_dedupes_by_eprint(self) -> None:
-        merged, added = _merge_entries(
+        merged, added, updated = _merge_entries(
             [
                 _entry("Keep", author="Doe, Jane", title="Original", year="2020", eprint="2401.00001"),
             ],
             [
-                _entry("Remote", author="Hannuksela, Otto", title="Different Title", year="2024", eprint="2401.00001"),
+                _entry(
+                    "Remote",
+                    author="Hannuksela, Otto",
+                    title="Different Title",
+                    year="2024",
+                    eprint="2401.00001",
+                    journal="Phys. Rev. D",
+                ),
             ],
         )
 
         self.assertEqual(len(merged), 1)
         self.assertEqual(added, [])
+        self.assertEqual(len(updated), 1)
+        self.assertEqual(merged[0].fields["journal"], "Phys. Rev. D")
 
     def test_merge_sorts_by_year_author_then_title(self) -> None:
-        merged, _added = _merge_entries(
+        merged, _added, _updated = _merge_entries(
             [
                 _entry("ZuluKey", author="Zulu, Zoe", title="Later Title", year="2025"),
             ],
@@ -233,6 +246,27 @@ class InspireBehaviorTests(unittest.TestCase):
         self.assertTrue(all("Bayesian" in result.title for result in results))
         self.assertEqual(len(client.requested_urls), 2)
 
+    def test_fetch_entry_adds_arxiv_journal_for_preprints(self) -> None:
+        client = RecordingLookupClient(
+            pages=[],
+            bibtex_by_recid={
+                3064813: """@article{Ray:2025rtt,
+  author = {Ray, Anarya},
+  title = {GW231123: extreme spins or microglitches?},
+  eprint = {2510.07228},
+  archivePrefix = {arXiv},
+  primaryClass = {gr-qc},
+  year = {2025}
+}
+""",
+            },
+        )
+
+        entry = client.fetch_entry(3064813)
+
+        self.assertEqual(entry.fields["journal"], "arXiv")
+        self.assertEqual(entry.fields["archiveprefix"], "arXiv")
+
     def test_fetch_query_entries_fetches_bibtex_for_each_match(self) -> None:
         client = RecordingLookupClient(
             pages=[
@@ -378,7 +412,7 @@ class FetchingFakeInspireClient(FakeInspireClient):
         return _entry(f"Fetched{recid}", author="Hannuksela, Otto", title=f"Fetched {recid}", year="2025")
 
 
-def _entry(key: str, *, author: str, title: str, year: str, doi: str | None = None, eprint: str | None = None) -> BibEntry:
+def _entry(key: str, *, author: str, title: str, year: str, doi: str | None = None, eprint: str | None = None, journal: str | None = None) -> BibEntry:
     fields = {
         "author": author,
         "title": title,
@@ -388,6 +422,8 @@ def _entry(key: str, *, author: str, title: str, year: str, doi: str | None = No
         fields["doi"] = doi
     if eprint is not None:
         fields["eprint"] = eprint
+    if journal is not None:
+        fields["journal"] = journal
     return BibEntry(entry_type="article", key=key, fields=fields)
 
 

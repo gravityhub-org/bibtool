@@ -139,6 +139,59 @@ class StubProvider:
 
 
 class BibtoolCliTests(unittest.TestCase):
+    def test_import_updates_existing_entry_and_preserves_key(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "references.bib"
+            target.write_text(
+                """@article{Ray2025GW231123Extreme,
+  author = {Ray, Anarya and Banagiri, Sharan and Thrane, Eric and Lasky, Paul D.},
+  title = {GW231123: extreme spins or microglitches?},
+  archiveprefix = {arXiv},
+  eprint = {2510.07228},
+  primaryclass = {gr-qc},
+  year = {2025},
+  month = {10},
+  reportnumber = {LIGO-P2500613}
+}
+""",
+                encoding="utf-8",
+            )
+
+            provider = StubProvider(
+                query_entries=[
+                    BibEntry(
+                        entry_type="article",
+                        key="Ray:2025rtt",
+                        fields={
+                            "author": "Ray, Anarya and Banagiri, Sharan and Thrane, Eric and Lasky, Paul D.",
+                            "title": "GW231123: extreme spins or microglitches?",
+                            "eprint": "2510.07228",
+                            "archiveprefix": "arXiv",
+                            "primaryclass": "gr-qc",
+                            "journal": "arXiv",
+                            "year": "2025",
+                            "month": "10",
+                            "reportnumber": "LIGO-P2500613",
+                        },
+                    ),
+                ]
+            )
+
+            stdout = io.StringIO()
+            exit_code = run(
+                ["--title", "GW231123", "extreme", "spins", "--bib", str(target), "--y"],
+                stdin=io.StringIO(),
+                stdout=stdout,
+                stderr=io.StringIO(),
+                provider=provider,
+            )
+
+            self.assertEqual(exit_code, 0)
+            content = target.read_text(encoding="utf-8")
+            self.assertIn("@article{Ray2025GW231123Extreme,", content)
+            self.assertIn("journal = {arXiv}", content)
+            self.assertIn("Updated 1 entries", stdout.getvalue())
+
     def test_template_merge_dedupes_by_title_and_preserves_existing_key(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

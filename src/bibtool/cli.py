@@ -6,7 +6,18 @@ from pathlib import Path
 import sys
 from typing import Sequence, TextIO
 
-from .bibtex import BibEntry, assign_generated_key, dedupe_tokens, normalize_for_match, parse_bibtex, sort_key, write_bibtex
+from .bibtex import (
+    BibEntry,
+    assign_generated_key,
+    dedupe_tokens,
+    entries_equivalent,
+    find_matching_entry_index,
+    merge_entry_fields,
+    normalize_for_match,
+    parse_bibtex,
+    sort_key,
+    write_bibtex,
+)
 from .inspire import InspireClient, InspireError
 
 
@@ -38,6 +49,8 @@ def run(
             return completion_result
         if argv and argv[0] == "search":
             return _run_search(argv[1:], stdout=stdout, provider=provider)
+        if argv and argv[0] == "update":
+            return _run_update(argv[1:], stdin=stdin, stdout=stdout, provider=provider)
         return _run_default(argv, stdin=stdin, stdout=stdout, provider=provider)
     except (CliError, InspireError, ValueError) as error:
         stderr.write(f"bibtool: {error}\n")
@@ -118,6 +131,83 @@ def _run_default(
     if not args.target:
         raise CliError("Provide a target BibTeX path or use --query/--name/--title.")
     return _merge_template(target_path=Path(args.target), stdin=stdin, stdout=stdout, auto_confirm=args.yes)
+
+
+def _run_update(
+    argv: Sequence[str],
+    *,
+    stdin: TextIO,
+    stdout: TextIO,
+    provider: InspireClient,
+) -> int:
+    parser = argparse.ArgumentParser(prog="bibtool update")
+    parser.add_argument("target", nargs="?")
+    parser.add_argument("--bib", dest="bib_path")
+    parser.add_argument("--y", action="store_true", dest="yes")
+    args = parser.parse_args(list(argv))
+
+    if args.bib_path and args.target:
+        raise CliError("Use either a positional bibliography path or --bib, not both.")
+
+    if args.bib_path:
+        target_path = Path(args.bib_path)
+    elif args.target:
+        target_path = Path(args.target)
+    else:
+        target_path = _default_import_target_path(None)
+
+    if not target_path.exists():
+        raise CliError(f"Bibliography not found at {target_path}.")
+
+    existing = _read_bib_entries(target_path)
+    if not existing:
+        stdout.write(f"No entries to update in {target_path}.\n")
+        return 0
+
+    merged, updated, skipped = _refresh_entries(existing, provider)
+
+    if not updated:
+        stdout.write(f"No entries updated in {target_path}.\n")
+        if skipped:
+            stdout.write(f"Skipped {len(skipped)} entries without an INSPIRE match.\n")
+        return 0
+
+    _double_confirm_large_additions(
+        len(updated),
+        stdin=stdin,
+        stdout=stdout,
+        auto_confirm=args.yes,
+        action="update",
+    )
+    target_path.write_text(write_bibtex(merged), encoding="utf-8")
+    stdout.write(f"Updated {len(updated)} entries in {target_path}.\n")
+    if skipped:
+        stdout.write(f"Skipped {len(skipped)} entries without an INSPIRE match.\n")
+    return 0
+
+
+def _refresh_entries(
+    existing: list[BibEntry],
+    provider: InspireClient,
+) -> tuple[list[BibEntry], list[BibEntry], list[str]]:
+    merged: list[BibEntry] = []
+    updated: list[BibEntry] = []
+    skipped: list[str] = []
+
+    for entry in existing:
+        refreshed = provider.refresh_entry(entry)
+        if refreshed is None:
+            skipped.append(entry.key)
+            merged.append(entry.clone())
+            continue
+        if entries_equivalent(entry, refreshed):
+            merged.append(entry.clone())
+            continue
+        merged.append(refreshed)
+        updated.append(refreshed)
+
+    merged.sort(key=sort_key)
+    return merged, updated, skipped
 
 
 def _run_search(argv: Sequence[str], *, stdout: TextIO, provider: InspireClient) -> int:
@@ -212,15 +302,23 @@ def _add_entries(
     auto_confirm: bool,
 ) -> int:
     existing = _read_bib_entries(target_path) if target_path.exists() else []
-    merged_entries, added = _merge_entries(existing, incoming)
+    merged_entries, added, updated = _merge_entries(existing, incoming)
 
-    if not added:
-        stdout.write(f"No new entries added from {origin}.\n")
+    if not added and not updated:
+        stdout.write(f"No new or updated entries from {origin}.\n")
         return 0
 
-    _double_confirm_large_additions(len(added), stdin=stdin, stdout=stdout, auto_confirm=auto_confirm)
+    _double_confirm_large_additions(
+        len(added) + len(updated),
+        stdin=stdin,
+        stdout=stdout,
+        auto_confirm=auto_confirm,
+    )
     target_path.write_text(write_bibtex(merged_entries), encoding="utf-8")
-    stdout.write(f"Added {len(added)} entries to {target_path}.\n")
+    if added:
+        stdout.write(f"Added {len(added)} entries to {target_path}.\n")
+    if updated:
+        stdout.write(f"Updated {len(updated)} entries in {target_path}.\n")
     return 0
 
 
@@ -230,17 +328,31 @@ def _read_bib_entries(path: Path) -> list[BibEntry]:
     return parse_bibtex(path.read_text(encoding="utf-8"))
 
 
-def _merge_entries(existing: list[BibEntry], incoming: list[BibEntry]) -> tuple[list[BibEntry], list[BibEntry]]:
+def _merge_entries(
+    existing: list[BibEntry],
+    incoming: list[BibEntry],
+) -> tuple[list[BibEntry], list[BibEntry], list[BibEntry]]:
     used_keys = {entry.key.lower() for entry in existing}
     seen = set().union(*(dedupe_tokens(entry) for entry in existing))
     merged = [entry.clone() for entry in existing]
     added: list[BibEntry] = []
+    updated: list[BibEntry] = []
 
     for entry in incoming:
+        if not dedupe_tokens(entry) and _entry_looks_empty(entry):
+            continue
+
+        match_index = find_matching_entry_index(merged, entry)
+        if match_index is not None:
+            refreshed = merge_entry_fields(merged[match_index], entry)
+            if entries_equivalent(merged[match_index], refreshed):
+                continue
+            merged[match_index] = refreshed
+            updated.append(refreshed)
+            continue
+
         tokens = dedupe_tokens(entry)
         if tokens and tokens & seen:
-            continue
-        if not tokens and _entry_looks_empty(entry):
             continue
         prepared = assign_generated_key(entry, used_keys)
         merged.append(prepared)
@@ -248,14 +360,21 @@ def _merge_entries(existing: list[BibEntry], incoming: list[BibEntry]) -> tuple[
         seen.update(dedupe_tokens(prepared))
 
     merged.sort(key=sort_key)
-    return merged, added
+    return merged, added, updated
 
 
 def _entry_looks_empty(entry: BibEntry) -> bool:
     return not normalize_for_match(entry.title) and not normalize_for_match(entry.author)
 
 
-def _double_confirm_large_additions(count: int, *, stdin: TextIO, stdout: TextIO, auto_confirm: bool) -> None:
+def _double_confirm_large_additions(
+    count: int,
+    *,
+    stdin: TextIO,
+    stdout: TextIO,
+    auto_confirm: bool,
+    action: str = "add",
+) -> None:
     if count <= 10:
         return
 
@@ -263,16 +382,16 @@ def _double_confirm_large_additions(count: int, *, stdin: TextIO, stdout: TextIO
         return
 
     if not getattr(stdin, "isatty", lambda: False)():
-        raise CliError(f"Refusing to add {count} entries non-interactively; rerun in a terminal to confirm.")
+        raise CliError(f"Refusing to {action} {count} entries non-interactively; rerun in a terminal to confirm.")
 
-    stdout.write(f"{count} entries are about to be added.\n")
+    stdout.write(f"{count} entries are about to be {action}d.\n")
     stdout.write("Continue? [y/N]: ")
     _flush_output(stdout)
     first = stdin.readline().strip().lower()
     if first not in {"y", "yes"}:
         raise CliError("Aborted before writing changes.")
 
-    stdout.write(f"Final confirmation to add {count} entries? [y/N]: ")
+    stdout.write(f"Final confirmation to {action} {count} entries? [y/N]: ")
     _flush_output(stdout)
     second = stdin.readline().strip().lower()
     if second not in {"y", "yes"}:
@@ -296,7 +415,7 @@ def _bash_completion_script() -> str:
     return """# bash completion for bibtool
 _bibtool_completion() {
     local cur prev cword
-    local root_opts search_opts
+    local root_opts search_opts update_opts
 
     COMPREPLY=()
     cur="${COMP_WORDS[COMP_CWORD]}"
@@ -305,8 +424,9 @@ _bibtool_completion() {
         prev="${COMP_WORDS[COMP_CWORD-1]}"
     fi
     cword=${COMP_CWORD}
-    root_opts="search --bib --query --name --title --y --print-completion --install-completion -h --help"
+    root_opts="search update --bib --query --name --title --y --print-completion --install-completion -h --help"
     search_opts="--name --title --limit -h --help"
+    update_opts="--bib --y -h --help"
 
     case "${prev}" in
         --bib)
@@ -331,6 +451,15 @@ _bibtool_completion() {
         if [[ "${cur}" == -* ]]; then
             COMPREPLY=( $(compgen -W "${search_opts}" -- "${cur}") )
         fi
+        return
+    fi
+
+    if [[ "${COMP_WORDS[1]}" == "update" ]]; then
+        if [[ "${cur}" == -* ]]; then
+            COMPREPLY=( $(compgen -W "${update_opts}" -- "${cur}") )
+            return
+        fi
+        COMPREPLY=( $(compgen -f -X '!*.bib' -- "${cur}") )
         return
     fi
 

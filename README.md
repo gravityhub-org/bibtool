@@ -12,6 +12,8 @@ uv tool install --upgrade git+https://github.com/gravityhub-org/bibtool.git && b
 
 ```bash
 bibtool references.bib
+bibtool update
+bibtool update references.bib --y
 bibtool --y --name Otto Hannuksela
 bibtool --query Otto Hannuksela
 bibtool --name Otto Hannuksela
@@ -28,9 +30,14 @@ bibtool --install-completion
 - `--query`, `--name`, and `--title` import into `$LATEX_TEMPLATE_DIR/references.bib` by default, or another file via `--bib`.
 - `--name` and `--title` can be combined in one import command; their results are merged and de-duplicated before writing.
 - `search` takes plain search terms and queries INSPIRE HEP without modifying files.
+- `update` refreshes every entry in a bibliography from INSPIRE, preserving existing BibTeX keys.
+- `update` defaults to `$LATEX_TEMPLATE_DIR/references.bib`, or accepts a path/`--bib`.
+- `update` looks up records by eprint, then DOI, then author and title.
 - `search --name ... --title ...` can also combine both filters; results are merged and de-duplicated.
 - Search/import use a looser cuhkvoting-style keyword query across title and author, then apply a case-insensitive local AND filter on the returned metadata.
 - Duplicate detection is case-insensitive and checks title, DOI, and eprint rather than only BibTeX keys.
+- Matching entries are updated in place from INSPIRE or template data while preserving their existing BibTeX keys.
+- arXiv-only `@article` records from INSPIRE get `journal = {arXiv}` so REVTeX/APS BibTeX styles compile cleanly.
 - Newly added keys use `FirstAuthorYearFirstTwoTitleWords`, while existing keys in the destination file stay unchanged.
 - Output is sorted by year, then first author, then title.
 - Adding more than 10 entries requires two interactive confirmations unless `--y` is passed.
