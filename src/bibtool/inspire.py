@@ -40,17 +40,13 @@ class InspireClient:
         )
 
     def fetch_author_entries(self, query: str) -> list[BibEntry]:
-        query_words = _normalized_words(query)
         return self._fetch_bibtex_entries(
             self._author_query(query),
-            matcher=lambda entry: _entry_contains_all_words(entry, query_words, include_author=True, include_title=False),
         )
 
     def fetch_title_entries(self, query: str) -> list[BibEntry]:
-        query_words = _normalized_words(query)
         return self._fetch_bibtex_entries(
             self._title_query(query),
-            matcher=lambda entry: _entry_contains_all_words(entry, query_words, include_author=False, include_title=True),
         )
 
     def search(self, query: str, limit: int | None = 20) -> list[SearchResult]:
@@ -78,7 +74,7 @@ class InspireClient:
         self,
         query: str,
         *,
-        matcher: Callable[[BibEntry], bool],
+        matcher: Callable[[BibEntry], bool] | None = None,
     ) -> list[BibEntry]:
         entries: list[BibEntry] = []
         page = 1
@@ -94,11 +90,12 @@ class InspireClient:
                 }
             )
             body = self._request_text(f"{self.base_url}/?{params}")
-            page_entries = [entry for entry in parse_bibtex(body) if matcher(entry)]
+            parsed_entries = parse_bibtex(body)
+            page_entries = [entry for entry in parsed_entries if matcher(entry)] if matcher is not None else parsed_entries
             if not page_entries:
                 break
             entries.extend(page_entries)
-            if len(page_entries) < page_size:
+            if len(parsed_entries) < page_size:
                 break
             page += 1
         return entries
