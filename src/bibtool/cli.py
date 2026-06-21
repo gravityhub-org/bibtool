@@ -91,7 +91,12 @@ def _run_default(
             raise CliError("Use --bib to choose the output file when importing by query.")
         query = " ".join(args.query or args.name or args.title)
         target_path = Path(args.bib_path)
-        incoming = provider.fetch_query_entries(query)
+        if args.name:
+            incoming = provider.fetch_author_entries(query)
+        elif args.title:
+            incoming = provider.fetch_title_entries(query)
+        else:
+            incoming = provider.fetch_query_entries(query)
         return _add_entries(
             target_path=target_path,
             incoming=incoming,

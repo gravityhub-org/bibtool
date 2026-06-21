@@ -33,13 +33,25 @@ class InspireClient:
         self.timeout = timeout
 
     def fetch_query_entries(self, query: str) -> list[BibEntry]:
-        return [self.fetch_entry(result.recid) for result in self.search(query, limit=None)]
+        query_words = _normalized_words(query)
+        return self._fetch_bibtex_entries(
+            self._keyword_query(query),
+            matcher=lambda entry: _entry_contains_all_words(entry, query_words, include_author=True, include_title=True),
+        )
 
     def fetch_author_entries(self, query: str) -> list[BibEntry]:
-        return self.fetch_query_entries(query)
+        query_words = _normalized_words(query)
+        return self._fetch_bibtex_entries(
+            self._author_query(query),
+            matcher=lambda entry: _entry_contains_all_words(entry, query_words, include_author=True, include_title=False),
+        )
 
     def fetch_title_entries(self, query: str) -> list[BibEntry]:
-        return self.fetch_query_entries(query)
+        query_words = _normalized_words(query)
+        return self._fetch_bibtex_entries(
+            self._title_query(query),
+            matcher=lambda entry: _entry_contains_all_words(entry, query_words, include_author=False, include_title=True),
+        )
 
     def search(self, query: str, limit: int | None = 20) -> list[SearchResult]:
         normalized_query_words = _normalized_words(query)
@@ -61,6 +73,35 @@ class InspireClient:
         if not entries:
             raise InspireError(f"INSPIRE returned no BibTeX for record {recid}.")
         return entries[0]
+
+    def _fetch_bibtex_entries(
+        self,
+        query: str,
+        *,
+        matcher: Callable[[BibEntry], bool],
+    ) -> list[BibEntry]:
+        entries: list[BibEntry] = []
+        page = 1
+        page_size = 50
+        while page <= 10:
+            params = urlencode(
+                {
+                    "q": query,
+                    "page": page,
+                    "size": page_size,
+                    "sort": "mostrecent",
+                    "format": "bibtex",
+                }
+            )
+            body = self._request_text(f"{self.base_url}/?{params}")
+            page_entries = [entry for entry in parse_bibtex(body) if matcher(entry)]
+            if not page_entries:
+                break
+            entries.extend(page_entries)
+            if len(page_entries) < page_size:
+                break
+            page += 1
+        return entries
 
     def _search_records(
         self,
@@ -100,7 +141,7 @@ class InspireClient:
         return results
 
     def _keyword_query(self, query: str) -> str:
-        tokens = [token for token in query.split() if token.strip()]
+        tokens = _query_tokens(query)
         searchable = [
             token
             for token in tokens
@@ -111,6 +152,18 @@ class InspireClient:
         if not searchable:
             raise InspireError("Search query cannot be empty.")
         return " and ".join(f'(title:"{_escape_query_token(token)}" or author:"{_escape_query_token(token)}")' for token in searchable)
+
+    def _author_query(self, query: str) -> str:
+        tokens = _query_tokens(query)
+        if not tokens:
+            raise InspireError("Search query cannot be empty.")
+        return " and ".join(f'author:"{_escape_query_token(token)}"' for token in tokens)
+
+    def _title_query(self, query: str) -> str:
+        tokens = _query_tokens(query)
+        if not tokens:
+            raise InspireError("Search query cannot be empty.")
+        return " and ".join(f'title:"{_escape_query_token(token)}"' for token in tokens)
 
     def _request_json(self, url: str) -> dict[str, Any]:
         try:
@@ -182,10 +235,32 @@ def _normalized_words(value: str) -> list[str]:
     return [word for word in normalize_for_match(value).split() if word]
 
 
+def _query_tokens(value: str) -> list[str]:
+    return [token for token in value.split() if token.strip()]
+
+
 def _result_contains_all_words(result: SearchResult, required_words: list[str]) -> bool:
     if not required_words:
         return True
     haystack = normalize_for_match(" ".join([result.title, result.abstract, *result.authors]))
+    return all(word in haystack for word in required_words)
+
+
+def _entry_contains_all_words(
+    entry: BibEntry,
+    required_words: list[str],
+    *,
+    include_author: bool,
+    include_title: bool,
+) -> bool:
+    if not required_words:
+        return True
+    fields: list[str] = []
+    if include_title:
+        fields.append(entry.title)
+    if include_author:
+        fields.append(entry.author)
+    haystack = normalize_for_match(" ".join(fields))
     return all(word in haystack for word in required_words)
 
 

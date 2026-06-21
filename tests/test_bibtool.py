@@ -24,8 +24,10 @@ class StubProvider:
         self.query_entries = query_entries or []
         self.query_results = query_results or []
         self.seen_queries: list[tuple[str, int | None]] = []
+        self.fetch_calls: list[tuple[str, str]] = []
 
     def fetch_query_entries(self, query: str):
+        self.fetch_calls.append(("query", query))
         self.seen_queries.append((query, None))
         return list(self.query_entries)
 
@@ -35,10 +37,12 @@ class StubProvider:
         return results if limit is None else results[:limit]
 
     def fetch_author_entries(self, query: str):
-        return self.fetch_query_entries(query)
+        self.fetch_calls.append(("author", query))
+        return list(self.query_entries)
 
     def fetch_title_entries(self, query: str):
-        return self.fetch_query_entries(query)
+        self.fetch_calls.append(("title", query))
+        return list(self.query_entries)
 
     def search_author(self, query: str, limit: int | None = 20):
         return self.search(query, limit=limit)
@@ -143,6 +147,7 @@ class BibtoolCliTests(unittest.TestCase):
             self.assertIn("@article{KeepThisKey,", content)
             self.assertIn("@article{Hannuksela2024GWTC5Methods,", content)
             self.assertEqual(content.count("GWTC-5 Overview"), 1)
+            self.assertIn(("query", "GWTC-5"), provider.fetch_calls)
 
     def test_large_import_requires_two_confirmations(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -173,6 +178,7 @@ class BibtoolCliTests(unittest.TestCase):
             self.assertTrue(target.exists())
             self.assertIn('Type "add" to continue:', stdout.getvalue())
             self.assertEqual(target.read_text(encoding="utf-8").count("@article{"), 11)
+            self.assertIn(("author", "Otto Hannuksela"), provider.fetch_calls)
 
     def test_search_title_is_case_insensitive(self) -> None:
         provider = StubProvider(
@@ -220,6 +226,24 @@ class BibtoolCliTests(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         self.assertIn(("GWTC-5 Hannuksela", 20), provider.seen_queries)
         self.assertIn("GWTC-5 Methods", stdout.getvalue())
+
+    def test_title_alias_uses_title_fetch_path(self) -> None:
+        provider = StubProvider(
+            query_entries=[_entry("RemoteKey", author="Hannuksela, Otto", title="GWTC-5 Methods", year="2024")]
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "references.bib"
+            exit_code = run(
+                ["--title", "GWTC-5", "--bib", str(target)],
+                stdin=io.StringIO(),
+                stdout=io.StringIO(),
+                stderr=io.StringIO(),
+                provider=provider,
+            )
+
+        self.assertEqual(exit_code, 0)
+        self.assertIn(("title", "GWTC-5"), provider.fetch_calls)
 
     def test_print_completion_outputs_bash_script(self) -> None:
         stdout = io.StringIO()

@@ -168,19 +168,30 @@ class InspireBehaviorTests(unittest.TestCase):
         self.assertEqual([result.recid for result in results], [3])
 
     def test_fetch_query_entries_fetches_bibtex_for_each_match(self) -> None:
-        client = FetchingFakeInspireClient(
-            pages=[
-                _search_page(
-                    _search_hit(recid=3, title="GWTC-5 Methods", author="A", year="2025"),
-                    _search_hit(recid=4, title="GWTC-5 Results", author="B", year="2025"),
-                )
+        client = BibtexPagingFakeInspireClient(
+            bodies=[
+                """@article{Fetched3,\n  author = {Hannuksela, Otto},\n  title = {GWTC-5 Methods},\n  year = {2025}\n}\n\n@article{Fetched4,\n  author = {Hannuksela, Otto},\n  title = {GWTC-5 Results},\n  year = {2025}\n}\n""",
+                "",
             ]
         )
 
         entries = client.fetch_query_entries("GWTC-5")
 
         self.assertEqual([entry.key for entry in entries], ["Fetched3", "Fetched4"])
-        self.assertEqual(client.fetched_recids, [3, 4])
+        self.assertEqual(len(client.requested_text_urls), 1)
+        self.assertIn("format=bibtex", client.requested_text_urls[0])
+
+    def test_fetch_author_entries_uses_author_only_query(self) -> None:
+        client = BibtexPagingFakeInspireClient(
+            bodies=[
+                """@article{Fetched3,\n  author = {Hannuksela, Otto Akseli},\n  title = {Lensing Methods},\n  year = {2025}\n}\n""",
+            ]
+        )
+
+        entries = client.fetch_author_entries("Otto Hannuksela")
+
+        self.assertEqual([entry.key for entry in entries], ["Fetched3"])
+        self.assertIn("q=author%3A%22Otto%22+and+author%3A%22Hannuksela%22", client.requested_text_urls[0])
 
 
 class TtyStringIO(io.StringIO):
@@ -218,6 +229,17 @@ class FetchingFakeInspireClient(FakeInspireClient):
     def fetch_entry(self, recid: int) -> BibEntry:
         self.fetched_recids.append(recid)
         return _entry(f"Fetched{recid}", author="Hannuksela, Otto", title=f"Fetched {recid}", year="2025")
+
+
+class BibtexPagingFakeInspireClient(InspireClient):
+    def __init__(self, *, bodies) -> None:
+        super().__init__(base_url="https://example.test/api/literature", timeout=1.0)
+        self.bodies = list(bodies)
+        self.requested_text_urls: list[str] = []
+
+    def _request_text(self, url: str) -> str:
+        self.requested_text_urls.append(url)
+        return self.bodies.pop(0) if self.bodies else ""
 
 
 def _entry(key: str, *, author: str, title: str, year: str, doi: str | None = None, eprint: str | None = None) -> BibEntry:
