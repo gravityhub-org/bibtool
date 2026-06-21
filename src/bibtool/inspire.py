@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
-from typing import Any
+from typing import Any, Callable
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import urlopen
@@ -20,6 +20,7 @@ class SearchResult:
     title: str
     authors: list[str]
     year: str
+    abstract: str = ""
 
     @property
     def first_author(self) -> str:
@@ -27,40 +28,32 @@ class SearchResult:
 
 
 class InspireClient:
-    def __init__(self, base_url: str = "https://inspirehep.net/api/literature") -> None:
+    def __init__(self, base_url: str = "https://inspirehep.net/api/literature", timeout: float = 10.0) -> None:
         self.base_url = base_url.rstrip("/")
+        self.timeout = timeout
+
+    def fetch_query_entries(self, query: str) -> list[BibEntry]:
+        return [self.fetch_entry(result.recid) for result in self.search(query, limit=None)]
 
     def fetch_author_entries(self, query: str) -> list[BibEntry]:
-        matches = self._search_records(query)
-        normalized_query = normalize_for_match(query)
-        filtered = [
-            result
-            for result in matches
-            if any(normalized_query in normalize_for_match(author) for author in result.authors)
-        ]
-        return [self.fetch_entry(result.recid) for result in filtered]
+        return self.fetch_query_entries(query)
 
     def fetch_title_entries(self, query: str) -> list[BibEntry]:
-        matches = self.search_title(query, limit=None)
-        return [self.fetch_entry(result.recid) for result in matches]
+        return self.fetch_query_entries(query)
+
+    def search(self, query: str, limit: int | None = 20) -> list[SearchResult]:
+        normalized_query_words = _normalized_words(query)
+        return self._search_records(
+            self._keyword_query(query),
+            matcher=lambda result: _result_contains_all_words(result, normalized_query_words),
+            limit=limit,
+        )
 
     def search_title(self, query: str, limit: int | None = 20) -> list[SearchResult]:
-        normalized_query = normalize_for_match(query)
-        filtered = [
-            result
-            for result in self._search_records(query)
-            if normalized_query in normalize_for_match(result.title)
-        ]
-        return filtered if limit is None else filtered[:limit]
+        return self.search(query, limit=limit)
 
     def search_author(self, query: str, limit: int | None = 20) -> list[SearchResult]:
-        normalized_query = normalize_for_match(query)
-        filtered = [
-            result
-            for result in self._search_records(query)
-            if any(normalized_query in normalize_for_match(author) for author in result.authors)
-        ]
-        return filtered if limit is None else filtered[:limit]
+        return self.search(query, limit=limit)
 
     def fetch_entry(self, recid: int) -> BibEntry:
         body = self._request_text(f"{self.base_url}/{recid}?format=bibtex")
@@ -69,32 +62,66 @@ class InspireClient:
             raise InspireError(f"INSPIRE returned no BibTeX for record {recid}.")
         return entries[0]
 
-    def _search_records(self, query: str) -> list[SearchResult]:
+    def _search_records(
+        self,
+        query: str,
+        *,
+        matcher: Callable[[SearchResult], bool],
+        limit: int | None,
+    ) -> list[SearchResult]:
         results: list[SearchResult] = []
         page = 1
-        size = 50
         while page <= 10:
-            params = urlencode({"q": query, "page": page, "size": size})
+            remaining = None if limit is None else limit - len(results)
+            if remaining is not None and remaining <= 0:
+                break
+            size = 50 if remaining is None else max(1, min(50, remaining))
+            params = urlencode(
+                {
+                    "q": query,
+                    "page": page,
+                    "size": size,
+                    "sort": "mostrecent",
+                    "fields": "titles,authors,abstracts,imprints,preprint_date,publication_info",
+                }
+            )
             payload = self._request_json(f"{self.base_url}/?{params}")
             hits = payload.get("hits", {}).get("hits", [])
             if not hits:
                 break
-            results.extend(_search_results_from_hits(hits))
+            for result in _search_results_from_hits(hits):
+                if matcher(result):
+                    results.append(result)
+                    if limit is not None and len(results) >= limit:
+                        return results
             if len(hits) < size:
                 break
             page += 1
         return results
 
+    def _keyword_query(self, query: str) -> str:
+        tokens = [token for token in query.split() if token.strip()]
+        searchable = [
+            token
+            for token in tokens
+            if token.lower() not in _STOP_WORDS and len(normalize_for_match(token).replace(" ", "")) > 1
+        ]
+        if not searchable:
+            searchable = tokens
+        if not searchable:
+            raise InspireError("Search query cannot be empty.")
+        return " and ".join(f'(title:"{_escape_query_token(token)}" or author:"{_escape_query_token(token)}")' for token in searchable)
+
     def _request_json(self, url: str) -> dict[str, Any]:
         try:
-            with urlopen(url) as response:
+            with urlopen(url, timeout=self.timeout) as response:
                 return json.load(response)
         except (HTTPError, URLError, json.JSONDecodeError) as error:
             raise InspireError(f"Unable to query INSPIRE: {error}") from error
 
     def _request_text(self, url: str) -> str:
         try:
-            with urlopen(url) as response:
+            with urlopen(url, timeout=self.timeout) as response:
                 return response.read().decode("utf-8")
         except (HTTPError, URLError, UnicodeDecodeError) as error:
             raise InspireError(f"Unable to fetch BibTeX from INSPIRE: {error}") from error
@@ -111,10 +138,11 @@ def _search_results_from_hits(hits: list[dict[str, Any]]) -> list[SearchResult]:
         ]
         title = _title_from_metadata(metadata)
         year = _year_from_metadata(metadata)
+        abstract = _abstract_from_metadata(metadata)
         recid = hit.get("id") or hit.get("metadata", {}).get("control_number")
         if not recid or not title:
             continue
-        results.append(SearchResult(recid=int(recid), title=title, authors=authors, year=year))
+        results.append(SearchResult(recid=int(recid), title=title, authors=authors, year=year, abstract=abstract))
     return results
 
 
@@ -139,3 +167,30 @@ def _year_from_metadata(metadata: dict[str, Any]) -> str:
         if year:
             return str(year)
     return ""
+
+
+def _abstract_from_metadata(metadata: dict[str, Any]) -> str:
+    abstracts = metadata.get("abstracts", [])
+    if abstracts:
+        abstract = abstracts[0].get("value")
+        if abstract:
+            return str(abstract)
+    return ""
+
+
+def _normalized_words(value: str) -> list[str]:
+    return [word for word in normalize_for_match(value).split() if word]
+
+
+def _result_contains_all_words(result: SearchResult, required_words: list[str]) -> bool:
+    if not required_words:
+        return True
+    haystack = normalize_for_match(" ".join([result.title, result.abstract, *result.authors]))
+    return all(word in haystack for word in required_words)
+
+
+def _escape_query_token(token: str) -> str:
+    return token.replace('"', '\\"')
+
+
+_STOP_WORDS = {"a", "an", "the", "of", "for", "to", "and", "or", "in", "on", "at", "by", "with"}

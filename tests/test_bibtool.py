@@ -6,11 +6,12 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from bibtool.cli import run
-from bibtool.inspire import SearchResult
+from bibtool.inspire import InspireClient, SearchResult
 
 
 class TtyStringIO(io.StringIO):
@@ -19,25 +20,31 @@ class TtyStringIO(io.StringIO):
 
 
 class StubProvider:
-    def __init__(self, *, author_entries=None, title_entries=None, author_results=None, title_results=None) -> None:
-        self.author_entries = author_entries or []
-        self.title_entries = title_entries or []
-        self.author_results = author_results or []
-        self.title_results = title_results or []
+    def __init__(self, *, query_entries=None, query_results=None) -> None:
+        self.query_entries = query_entries or []
+        self.query_results = query_results or []
+        self.seen_queries: list[tuple[str, int | None]] = []
+
+    def fetch_query_entries(self, query: str):
+        self.seen_queries.append((query, None))
+        return list(self.query_entries)
+
+    def search(self, query: str, limit: int | None = 20):
+        self.seen_queries.append((query, limit))
+        results = list(self.query_results)
+        return results if limit is None else results[:limit]
 
     def fetch_author_entries(self, query: str):
-        return list(self.author_entries)
+        return self.fetch_query_entries(query)
 
     def fetch_title_entries(self, query: str):
-        return list(self.title_entries)
+        return self.fetch_query_entries(query)
 
     def search_author(self, query: str, limit: int | None = 20):
-        results = list(self.author_results)
-        return results if limit is None else results[:limit]
+        return self.search(query, limit=limit)
 
     def search_title(self, query: str, limit: int | None = 20):
-        results = list(self.title_results)
-        return results if limit is None else results[:limit]
+        return self.search(query, limit=limit)
 
 
 class BibtoolCliTests(unittest.TestCase):
@@ -107,7 +114,7 @@ class BibtoolCliTests(unittest.TestCase):
             )
 
             provider = StubProvider(
-                title_entries=[
+                query_entries=[
                     _entry(
                         "RemoteKeyA",
                         author="Doe, Jane",
@@ -124,7 +131,7 @@ class BibtoolCliTests(unittest.TestCase):
             )
 
             exit_code = run(
-                ["--title", "GWTC-5", "--bib", str(target)],
+                ["--query", "GWTC-5", "--bib", str(target)],
                 stdin=io.StringIO(),
                 stdout=io.StringIO(),
                 stderr=io.StringIO(),
@@ -141,7 +148,7 @@ class BibtoolCliTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp) / "references.bib"
             provider = StubProvider(
-                author_entries=[
+                query_entries=[
                     _entry(
                         f"RemoteKey{index}",
                         author="Hannuksela, Otto",
@@ -169,7 +176,7 @@ class BibtoolCliTests(unittest.TestCase):
 
     def test_search_title_is_case_insensitive(self) -> None:
         provider = StubProvider(
-            title_results=[
+            query_results=[
                 SearchResult(
                     recid=101,
                     title="Searching For Gravitational Waves",
@@ -181,7 +188,7 @@ class BibtoolCliTests(unittest.TestCase):
 
         stdout = io.StringIO()
         exit_code = run(
-            ["search", "--title", "searching", "for"],
+            ["search", "searching", "for"],
             stdout=stdout,
             stderr=io.StringIO(),
             provider=provider,
@@ -189,6 +196,105 @@ class BibtoolCliTests(unittest.TestCase):
 
         self.assertEqual(exit_code, 0)
         self.assertIn("Searching For Gravitational Waves", stdout.getvalue())
+
+    def test_search_positional_query_uses_unified_provider_search(self) -> None:
+        provider = StubProvider(
+            query_results=[
+                SearchResult(
+                    recid=202,
+                    title="GWTC-5 Methods",
+                    authors=["Hannuksela, Otto"],
+                    year="2024",
+                )
+            ]
+        )
+
+        stdout = io.StringIO()
+        exit_code = run(
+            ["search", "GWTC-5", "Hannuksela"],
+            stdout=stdout,
+            stderr=io.StringIO(),
+            provider=provider,
+        )
+
+        self.assertEqual(exit_code, 0)
+        self.assertIn(("GWTC-5 Hannuksela", 20), provider.seen_queries)
+        self.assertIn("GWTC-5 Methods", stdout.getvalue())
+
+    def test_print_completion_outputs_bash_script(self) -> None:
+        stdout = io.StringIO()
+
+        exit_code = run(["--print-completion", "bash"], stdout=stdout, stderr=io.StringIO())
+
+        self.assertEqual(exit_code, 0)
+        script = stdout.getvalue()
+        self.assertIn("_bibtool_completion()", script)
+        self.assertIn("complete -F _bibtool_completion bibtool", script)
+        self.assertIn("--install-completion", script)
+
+    def test_install_completion_writes_expected_file(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            stdout = io.StringIO()
+            stderr = io.StringIO()
+            with patch.dict(os.environ, {"HOME": str(home)}, clear=False):
+                exit_code = run(["--install-completion"], stdout=stdout, stderr=stderr)
+
+            self.assertEqual(exit_code, 0)
+            completion_file = home / ".local" / "share" / "bash-completion" / "completions" / "bibtool"
+            self.assertTrue(completion_file.exists())
+            self.assertIn("_bibtool_completion()", completion_file.read_text(encoding="utf-8"))
+            self.assertIn(str(completion_file), stdout.getvalue())
+
+
+class InspireClientTests(unittest.TestCase):
+    def test_search_uses_keyword_query_and_stops_at_limit(self) -> None:
+        client = FakeInspireClient(
+            pages=[
+                _search_page(
+                    _search_hit(recid=index, title=f"GWTC-5 Result {index}", author="Hannuksela, Otto", year="2025")
+                    for index in range(1, 21)
+                ),
+                _search_page(
+                    _search_hit(recid=999, title="GWTC-5 Extra", author="Hannuksela, Otto", year="2025")
+                    for _ in range(20)
+                ),
+            ]
+        )
+
+        results = client.search("GWTC-5")
+
+        self.assertEqual(len(results), 20)
+        self.assertEqual(len(client.requested_urls), 1)
+        self.assertIn("q=%28title%3A%22GWTC-5%22+or+author%3A%22GWTC-5%22%29", client.requested_urls[0])
+        self.assertIn("size=20", client.requested_urls[0])
+        self.assertIn("fields=titles%2Cauthors%2Cabstracts%2Cimprints%2Cpreprint_date%2Cpublication_info", client.requested_urls[0])
+
+    def test_requests_use_timeout(self) -> None:
+        client = InspireClient(timeout=7.0)
+
+        class Response:
+            def __enter__(self):
+                return io.StringIO('{"hits":{"hits":[]}}')
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+        with patch("bibtool.inspire.urlopen", return_value=Response()) as mock_urlopen:
+            self.assertEqual(client.search("GWTC-5"), [])
+
+        self.assertEqual(mock_urlopen.call_args.kwargs["timeout"], 7.0)
+
+
+class FakeInspireClient(InspireClient):
+    def __init__(self, *, pages) -> None:
+        super().__init__(base_url="https://example.test/api/literature", timeout=1.0)
+        self.pages = list(pages)
+        self.requested_urls: list[str] = []
+
+    def _request_json(self, url: str):
+        self.requested_urls.append(url)
+        return self.pages.pop(0) if self.pages else {"hits": {"hits": []}}
 
 
 def _entry(key: str, *, author: str, title: str, year: str):
@@ -203,6 +309,21 @@ def _entry(key: str, *, author: str, title: str, year: str):
             "year": year,
         },
     )
+
+
+def _search_hit(*, recid: int, title: str, author: str, year: str) -> dict:
+    return {
+        "id": recid,
+        "metadata": {
+            "authors": [{"full_name": author}],
+            "titles": [{"title": title}],
+            "publication_info": [{"year": int(year)}],
+        },
+    }
+
+
+def _search_page(hits) -> dict:
+    return {"hits": {"hits": list(hits)}}
 
 
 if __name__ == "__main__":

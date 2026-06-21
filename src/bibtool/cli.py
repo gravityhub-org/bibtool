@@ -33,12 +33,41 @@ def run(
     provider = provider or InspireClient()
 
     try:
+        completion_result = _maybe_handle_completion(argv, stdout=stdout)
+        if completion_result is not None:
+            return completion_result
         if argv and argv[0] == "search":
             return _run_search(argv[1:], stdout=stdout, provider=provider)
         return _run_default(argv, stdin=stdin, stdout=stdout, provider=provider)
     except (CliError, InspireError, ValueError) as error:
         stderr.write(f"bibtool: {error}\n")
         return 1
+
+
+def _maybe_handle_completion(argv: Sequence[str], *, stdout: TextIO) -> int | None:
+    if not argv:
+        return None
+
+    if argv[0] == "--print-completion":
+        if len(argv) != 2:
+            raise CliError("Usage: bibtool --print-completion bash")
+        shell = argv[1]
+        if shell != "bash":
+            raise CliError("Only bash completion is supported.")
+        stdout.write(_bash_completion_script())
+        return 0
+
+    if argv[0] == "--install-completion":
+        shell = argv[1] if len(argv) > 1 else "bash"
+        if len(argv) > 2:
+            raise CliError("Usage: bibtool --install-completion [bash]")
+        if shell != "bash":
+            raise CliError("Only bash completion is supported.")
+        destination = _install_bash_completion()
+        stdout.write(f"Installed bash completion to {destination}\n")
+        return 0
+
+    return None
 
 
 def _run_default(
@@ -52,16 +81,17 @@ def _run_default(
     parser.add_argument("target", nargs="?")
     parser.add_argument("--bib", dest="bib_path", default="references.bib")
     mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--query", nargs="+")
     mode.add_argument("--name", nargs="+")
     mode.add_argument("--title", nargs="+")
     args = parser.parse_args(list(argv))
 
-    if args.name or args.title:
+    if args.query or args.name or args.title:
         if args.target:
-            raise CliError("Use --bib to choose the output file when importing by --name or --title.")
-        query = " ".join(args.name or args.title)
+            raise CliError("Use --bib to choose the output file when importing by query.")
+        query = " ".join(args.query or args.name or args.title)
         target_path = Path(args.bib_path)
-        incoming = provider.fetch_author_entries(query) if args.name else provider.fetch_title_entries(query)
+        incoming = provider.fetch_query_entries(query)
         return _add_entries(
             target_path=target_path,
             incoming=incoming,
@@ -71,20 +101,28 @@ def _run_default(
         )
 
     if not args.target:
-        raise CliError("Provide a target BibTeX path or use --name/--title.")
+        raise CliError("Provide a target BibTeX path or use --query/--name/--title.")
     return _merge_template(target_path=Path(args.target), stdin=stdin, stdout=stdout)
 
 
 def _run_search(argv: Sequence[str], *, stdout: TextIO, provider: InspireClient) -> int:
     parser = argparse.ArgumentParser(prog="bibtool search")
-    mode = parser.add_mutually_exclusive_group(required=True)
+    mode = parser.add_mutually_exclusive_group()
+    parser.add_argument("query", nargs="*")
     mode.add_argument("--name", nargs="+")
     mode.add_argument("--title", nargs="+")
     parser.add_argument("--limit", type=int, default=20)
     args = parser.parse_args(list(argv))
 
-    query = " ".join(args.name or args.title)
-    results = provider.search_author(query, limit=args.limit) if args.name else provider.search_title(query, limit=args.limit)
+    if args.query and (args.name or args.title):
+        raise CliError("Use either positional search terms or --name/--title, not both.")
+
+    query_parts = args.query or args.name or args.title or []
+    query = " ".join(query_parts)
+    if not query:
+        raise CliError("Search query cannot be empty.")
+
+    results = provider.search(query, limit=args.limit)
     if not results:
         stdout.write("No matching records found.\n")
         return 0
@@ -184,3 +222,64 @@ def _double_confirm_large_additions(count: int, *, stdin: TextIO, stdout: TextIO
     second = stdin.readline().strip()
     if second != str(count):
         raise CliError("Aborted before writing changes.")
+
+
+def _install_bash_completion() -> Path:
+    destination = Path.home() / ".local" / "share" / "bash-completion" / "completions" / "bibtool"
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text(_bash_completion_script(), encoding="utf-8")
+    return destination
+
+
+def _bash_completion_script() -> str:
+    return """# bash completion for bibtool
+_bibtool_completion() {
+    local cur prev cword
+    local root_opts search_opts
+
+    COMPREPLY=()
+    cur="${COMP_WORDS[COMP_CWORD]}"
+    prev=""
+    if [[ ${COMP_CWORD} -gt 0 ]]; then
+        prev="${COMP_WORDS[COMP_CWORD-1]}"
+    fi
+    cword=${COMP_CWORD}
+    root_opts="search --bib --query --name --title --print-completion --install-completion -h --help"
+    search_opts="--name --title --limit -h --help"
+
+    case "${prev}" in
+        --bib)
+            COMPREPLY=( $(compgen -f -X '!*.bib' -- "${cur}") )
+            return
+            ;;
+        --print-completion|--install-completion)
+            COMPREPLY=( $(compgen -W "bash" -- "${cur}") )
+            return
+            ;;
+        --limit|--query|--name|--title)
+            return
+            ;;
+    esac
+
+    if [[ ${cword} -eq 1 ]]; then
+        COMPREPLY=( $(compgen -W "${root_opts}" -- "${cur}") $(compgen -f -X '!*.bib' -- "${cur}") )
+        return
+    fi
+
+    if [[ "${COMP_WORDS[1]}" == "search" ]]; then
+        if [[ "${cur}" == -* ]]; then
+            COMPREPLY=( $(compgen -W "${search_opts}" -- "${cur}") )
+        fi
+        return
+    fi
+
+    if [[ "${cur}" == -* ]]; then
+        COMPREPLY=( $(compgen -W "${root_opts}" -- "${cur}") )
+        return
+    fi
+
+    COMPREPLY=( $(compgen -f -X '!*.bib' -- "${cur}") )
+}
+
+complete -F _bibtool_completion bibtool
+"""
