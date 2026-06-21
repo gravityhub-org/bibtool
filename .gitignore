@@ -1,0 +1,57 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/
+# Env / secrets
+.env
+.env.*
+!.env.example
+# Dependencies / package caches
+node_modules/
+vendor/
+.pnpm-store/
+.npm/
+.yarn/cache/
+# Build / coverage / temp
+dist/
+build/
+target/
+out/
+coverage/
+.tmp/
+tmp/
+.cache/
+# Archives
+*.zip
+*.tar
+*.gz
+# Local tooling
+.direnv/
+# Latex files
+*.aux
+*.lof
+*.lot
+*.fls
+*.out
+*.toc
+*.fmt
+*.fot
+*.cb
+*.cb2
+*.lb
+*.dvi
+*.nav
+*.snm
+*.vrb
+*.fdb_latexmk
+*.synctex.gz
+*.synctex(busy)
+*.bbl
+main.pdf

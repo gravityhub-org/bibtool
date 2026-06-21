@@ -30,8 +30,10 @@ class FlushTrackingStringIO(TtyStringIO):
 
 
 class StubProvider:
-    def __init__(self, *, query_entries=None, query_results=None) -> None:
+    def __init__(self, *, query_entries=None, query_results=None, author_entries=None, title_entries=None) -> None:
         self.query_entries = query_entries or []
+        self.author_entries = author_entries if author_entries is not None else list(self.query_entries)
+        self.title_entries = title_entries if title_entries is not None else list(self.query_entries)
         self.query_results = query_results or []
         self.seen_queries: list[tuple[str, int | None]] = []
         self.fetch_calls: list[tuple[str, str]] = []
@@ -48,11 +50,11 @@ class StubProvider:
 
     def fetch_author_entries(self, query: str):
         self.fetch_calls.append(("author", query))
-        return list(self.query_entries)
+        return list(self.author_entries)
 
     def fetch_title_entries(self, query: str):
         self.fetch_calls.append(("title", query))
-        return list(self.query_entries)
+        return list(self.title_entries)
 
     def search_author(self, query: str, limit: int | None = 20):
         return self.search(query, limit=limit)
@@ -207,6 +209,33 @@ class BibtoolCliTests(unittest.TestCase):
             self.assertIn("@article{KeepThisKey,", content)
             self.assertIn("@article{Hannuksela2024GWTC5Methods,", content)
 
+    def test_import_allows_name_and_title_together(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "references.bib"
+            provider = StubProvider(
+                author_entries=[
+                    _entry("AuthorKey", author="Hannuksela, Otto", title="Author Result", year="2024"),
+                ],
+                title_entries=[
+                    _entry("TitleKey", author="Cornish, Neil", title="GWTC-5 Result", year="2025"),
+                ],
+            )
+
+            exit_code = run(
+                ["--name", "Otto", "Hannuksela", "--title", "GWTC-5", "--bib", str(target), "--y"],
+                stdin=io.StringIO(),
+                stdout=io.StringIO(),
+                stderr=io.StringIO(),
+                provider=provider,
+            )
+
+            self.assertEqual(exit_code, 0)
+            content = target.read_text(encoding="utf-8")
+            self.assertIn("@article{Hannuksela2024AuthorResult,", content)
+            self.assertIn("@article{Cornish2025GWTC5Result,", content)
+            self.assertIn(("author", "Otto Hannuksela"), provider.fetch_calls)
+            self.assertIn(("title", "GWTC-5"), provider.fetch_calls)
+
     def test_import_requires_template_dir_when_bib_not_given(self) -> None:
         provider = StubProvider(query_entries=[_entry("RemoteKey", author="Hannuksela, Otto", title="GWTC-5 Methods", year="2024")])
         original = os.environ.pop("LATEX_TEMPLATE_DIR", None)
@@ -225,6 +254,19 @@ class BibtoolCliTests(unittest.TestCase):
 
         self.assertEqual(exit_code, 1)
         self.assertIn("LATEX_TEMPLATE_DIR is not set", stderr.getvalue())
+
+    def test_import_rejects_query_combined_with_name_or_title(self) -> None:
+        stderr = io.StringIO()
+        exit_code = run(
+            ["--query", "Neil Cornish", "--name", "Otto Hannuksela"],
+            stdin=io.StringIO(),
+            stdout=io.StringIO(),
+            stderr=stderr,
+            provider=StubProvider(),
+        )
+
+        self.assertEqual(exit_code, 1)
+        self.assertIn("Use --query by itself, or combine --name and --title.", stderr.getvalue())
 
     def test_large_import_requires_two_confirmations(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -358,6 +400,72 @@ class BibtoolCliTests(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         self.assertIn(("GWTC-5 Hannuksela", 20), provider.seen_queries)
         self.assertIn("GWTC-5 Methods", stdout.getvalue())
+
+    def test_search_allows_name_and_title_together(self) -> None:
+        provider = StubProvider(
+            query_results=[
+                SearchResult(
+                    recid=301,
+                    title="Author Match",
+                    authors=["Hannuksela, Otto"],
+                    year="2024",
+                ),
+                SearchResult(
+                    recid=302,
+                    title="Title Match",
+                    authors=["Cornish, Neil"],
+                    year="2025",
+                ),
+            ]
+        )
+
+        stdout = io.StringIO()
+        exit_code = run(
+            ["search", "--name", "Otto", "Hannuksela", "--title", "GWTC-5"],
+            stdout=stdout,
+            stderr=io.StringIO(),
+            provider=provider,
+        )
+
+        self.assertEqual(exit_code, 0)
+        self.assertIn(("Otto Hannuksela", 20), provider.seen_queries)
+        self.assertIn(("GWTC-5", 20), provider.seen_queries)
+        self.assertIn("Author Match", stdout.getvalue())
+        self.assertIn("Title Match", stdout.getvalue())
+
+    def test_search_dedupes_combined_name_and_title_results(self) -> None:
+        shared = SearchResult(
+            recid=401,
+            title="Shared Match",
+            authors=["Hannuksela, Otto"],
+            year="2024",
+        )
+        provider = StubProvider(
+            query_results=[shared, shared],
+        )
+
+        stdout = io.StringIO()
+        exit_code = run(
+            ["search", "--name", "Otto", "Hannuksela", "--title", "Shared"],
+            stdout=stdout,
+            stderr=io.StringIO(),
+            provider=provider,
+        )
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(stdout.getvalue().count("Shared Match"), 1)
+
+    def test_search_rejects_positional_query_mixed_with_name_or_title(self) -> None:
+        stderr = io.StringIO()
+        exit_code = run(
+            ["search", "Neil", "Cornish", "--name", "Otto", "Hannuksela"],
+            stdout=io.StringIO(),
+            stderr=stderr,
+            provider=StubProvider(),
+        )
+
+        self.assertEqual(exit_code, 1)
+        self.assertIn("Use either positional search terms or --name/--title, not both.", stderr.getvalue())
 
     def test_title_alias_uses_title_fetch_path(self) -> None:
         provider = StubProvider(

@@ -15,8 +15,10 @@ bibtool references.bib
 bibtool --y --name Otto Hannuksela
 bibtool --query Otto Hannuksela
 bibtool --name Otto Hannuksela
+bibtool --name Otto Hannuksela --title GWTC-5
 bibtool --title GWTC-5
 bibtool search "searching for"
+bibtool search --name Otto Hannuksela --title GWTC-5
 bibtool --install-completion
 ```
 
@@ -24,7 +26,9 @@ bibtool --install-completion
 
 - `bibtool references.bib` merges `$LATEX_TEMPLATE_DIR/references.bib` into the target file.
 - `--query`, `--name`, and `--title` import into `$LATEX_TEMPLATE_DIR/references.bib` by default, or another file via `--bib`.
+- `--name` and `--title` can be combined in one import command; their results are merged and de-duplicated before writing.
 - `search` takes plain search terms and queries INSPIRE HEP without modifying files.
+- `search --name ... --title ...` can also combine both filters; results are merged and de-duplicated.
 - Search/import use a looser cuhkvoting-style keyword query across title and author, then apply a case-insensitive local AND filter on the returned metadata.
 - Duplicate detection is case-insensitive and checks title, DOI, and eprint rather than only BibTeX keys.
 - Newly added keys use `FirstAuthorYearFirstTwoTitleWords`, while existing keys in the destination file stay unchanged.

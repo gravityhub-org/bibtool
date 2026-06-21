@@ -81,29 +81,38 @@ def _run_default(
     parser.add_argument("target", nargs="?")
     parser.add_argument("--bib", dest="bib_path")
     parser.add_argument("--y", action="store_true", dest="yes")
-    mode = parser.add_mutually_exclusive_group()
-    mode.add_argument("--query", nargs="+")
-    mode.add_argument("--name", nargs="+")
-    mode.add_argument("--title", nargs="+")
+    parser.add_argument("--query", nargs="+")
+    parser.add_argument("--name", nargs="+")
+    parser.add_argument("--title", nargs="+")
     args = parser.parse_args(list(argv))
 
     if args.query or args.name or args.title:
         if args.target:
             raise CliError("Use --bib to choose the output file when importing by query.")
-        query = " ".join(args.query or args.name or args.title)
         target_path = _default_import_target_path(args.bib_path)
+        if args.query and (args.name or args.title):
+            raise CliError("Use --query by itself, or combine --name and --title.")
+
+        incoming: list[BibEntry] = []
+        origins: list[str] = []
+        if args.query:
+            query = " ".join(args.query)
+            incoming.extend(provider.fetch_query_entries(query))
+            origins.append(f'INSPIRE query "{query}"')
         if args.name:
-            incoming = provider.fetch_author_entries(query)
-        elif args.title:
-            incoming = provider.fetch_title_entries(query)
-        else:
-            incoming = provider.fetch_query_entries(query)
+            query = " ".join(args.name)
+            incoming.extend(provider.fetch_author_entries(query))
+            origins.append(f'INSPIRE author "{query}"')
+        if args.title:
+            query = " ".join(args.title)
+            incoming.extend(provider.fetch_title_entries(query))
+            origins.append(f'INSPIRE title "{query}"')
         return _add_entries(
             target_path=target_path,
             incoming=incoming,
             stdin=stdin,
             stdout=stdout,
-            origin=f'INSPIRE query "{query}"',
+            origin=" + ".join(origins),
             auto_confirm=args.yes,
         )
 
@@ -114,22 +123,30 @@ def _run_default(
 
 def _run_search(argv: Sequence[str], *, stdout: TextIO, provider: InspireClient) -> int:
     parser = argparse.ArgumentParser(prog="bibtool search")
-    mode = parser.add_mutually_exclusive_group()
     parser.add_argument("query", nargs="*")
-    mode.add_argument("--name", nargs="+")
-    mode.add_argument("--title", nargs="+")
+    parser.add_argument("--name", nargs="+")
+    parser.add_argument("--title", nargs="+")
     parser.add_argument("--limit", type=int, default=20)
     args = parser.parse_args(list(argv))
 
     if args.query and (args.name or args.title):
         raise CliError("Use either positional search terms or --name/--title, not both.")
 
-    query_parts = args.query or args.name or args.title or []
-    query = " ".join(query_parts)
-    if not query:
-        raise CliError("Search query cannot be empty.")
+    results: list = []
+    if args.query:
+        query = " ".join(args.query)
+        if not query:
+            raise CliError("Search query cannot be empty.")
+        results = provider.search(query, limit=args.limit)
+    else:
+        if not args.name and not args.title:
+            raise CliError("Search query cannot be empty.")
+        if args.name:
+            results.extend(provider.search_author(" ".join(args.name), limit=args.limit))
+        if args.title:
+            results.extend(provider.search_title(" ".join(args.title), limit=args.limit))
+        results = _dedupe_search_results(results)[: args.limit]
 
-    results = provider.search(query, limit=args.limit)
     if not results:
         stdout.write("No matching records found.\n")
         return 0
@@ -139,6 +156,17 @@ def _run_search(argv: Sequence[str], *, stdout: TextIO, provider: InspireClient)
         year = result.year or "????"
         stdout.write(f"[{result.recid}] {author} ({year}) {result.title}\n")
     return 0
+
+
+def _dedupe_search_results(results: list) -> list:
+    seen: set[int] = set()
+    deduped: list = []
+    for result in results:
+        if result.recid in seen:
+            continue
+        seen.add(result.recid)
+        deduped.append(result)
+    return deduped
 
 
 def _default_import_target_path(bib_path: str | None) -> Path:
