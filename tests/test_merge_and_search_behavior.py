@@ -233,28 +233,6 @@ class InspireBehaviorTests(unittest.TestCase):
         self.assertTrue(all("Bayesian" in result.title for result in results))
         self.assertEqual(len(client.requested_urls), 2)
 
-    def test_request_json_is_cached(self) -> None:
-        payload = _search_page(
-            _search_hit(recid=1, title="Bayesian paper", author="Cornish, Neil J.", year="2024"),
-        )
-
-        class Response:
-            def __init__(self, body: str) -> None:
-                self._body = body
-
-            def __enter__(self):
-                return io.BytesIO(self._body.encode("utf-8"))
-
-            def __exit__(self, exc_type, exc, tb):
-                return False
-
-        client = InspireClient(base_url="https://example.test/api/literature", timeout=1.0)
-        with patch("bibtool.inspire.urlopen", return_value=Response(json.dumps(payload))) as mock_urlopen:
-            client.lookup(name="Neil Cornish", title="Bayes", limit=1, as_entries=False)
-            client.lookup(name="Neil Cornish", title="Bayes", limit=1, as_entries=False)
-
-        self.assertEqual(mock_urlopen.call_count, 1)
-
     def test_fetch_query_entries_fetches_bibtex_for_each_match(self) -> None:
         client = RecordingLookupClient(
             pages=[

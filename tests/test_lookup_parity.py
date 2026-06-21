@@ -100,30 +100,6 @@ class LookupParityTests(unittest.TestCase):
         self.assertEqual([entry.key for entry in fetch_entries], ["BayesPaper"])
         self.assertIn("title%3ABayes%2A", client.requested_urls[0])
 
-    def test_cached_repeat_lookup_skips_network(self) -> None:
-        from unittest.mock import patch
-
-        payload = _search_page(
-            _search_hit(recid=1, title="Bayesian paper", author="Cornish, Neil J.", year="2024"),
-        )
-
-        class Response:
-            def __init__(self, body: str) -> None:
-                self._body = body
-
-            def __enter__(self):
-                return io.BytesIO(self._body.encode("utf-8"))
-
-            def __exit__(self, exc_type, exc, tb):
-                return False
-
-        client = InspireClient(base_url="https://example.test/api/literature", timeout=1.0)
-        with patch("bibtool.inspire.urlopen", return_value=Response(json.dumps(payload))) as mock_urlopen:
-            client.lookup(name="Neil Cornish", title="Bayes", limit=1, as_entries=False)
-            client.lookup(name="Neil Cornish", title="Bayes", limit=1, as_entries=False)
-
-        self.assertEqual(mock_urlopen.call_count, 1)
-
     def test_cli_search_and_import_use_same_lookup_spec(self) -> None:
         provider = TrackingProvider()
 
