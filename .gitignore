@@ -55,3 +55,7 @@ tmp/
 *.synctex(busy)
 *.bbl
 main.pdf
+# Python cache
+__pycache__/
+# Mail
+mail
