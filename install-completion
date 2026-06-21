@@ -1,0 +1,1444 @@
+@article{Abbott2017AllSkySearch,
+  author = {Abbott, Benjamin P. and others},
+  title = {All-sky Search for Periodic Gravitational Waves in the O1 LIGO Data},
+  journal = {Phys. Rev. D},
+  archiveprefix = {arXiv},
+  eprint = {1707.02667},
+  primaryclass = {gr-qc},
+  doi = {10.1103/PhysRevD.96.062002},
+  year = {2017},
+  collaboration = {LIGO Scientific, Virgo},
+  number = {6},
+  pages = {062002},
+  volume = {96}
+}
+
+@article{Abbott2017FirstLowFrequency,
+  author = {Abbott, Benjamin P. and others},
+  title = {First low-frequency Einstein@Home all-sky search for continuous gravitational waves in Advanced LIGO data},
+  journal = {Phys. Rev. D},
+  archiveprefix = {arXiv},
+  eprint = {1707.02669},
+  primaryclass = {gr-qc},
+  doi = {10.1103/PhysRevD.96.122004},
+  year = {2017},
+  collaboration = {LIGO Scientific, Virgo},
+  number = {12},
+  pages = {122004},
+  volume = {96}
+}
+
+@article{Abbott2017FirstNarrowBand,
+  author = {Abbott, Benjamin P. and others},
+  title = {First narrow-band search for continuous gravitational waves from known pulsars in advanced detector data},
+  journal = {Phys. Rev. D},
+  archiveprefix = {arXiv},
+  eprint = {1710.02327},
+  primaryclass = {gr-qc},
+  doi = {10.1103/PhysRevD.96.122006},
+  year = {2017},
+  collaboration = {LIGO Scientific, Virgo},
+  note = {[Erratum: Phys.Rev.D 97, 129903 (2018)]},
+  number = {12},
+  pages = {122006},
+  volume = {96}
+}
+
+@article{Abbott2017GW170104Observation,
+  author = {Abbott, Benjamin P. and others},
+  title = {GW170104: Observation of a 50-Solar-Mass Binary Black Hole Coalescence at Redshift 0.2},
+  journal = {Phys. Rev. Lett.},
+  archiveprefix = {arXiv},
+  eprint = {1706.01812},
+  primaryclass = {gr-qc},
+  doi = {10.1103/PhysRevLett.118.221101},
+  year = {2017},
+  collaboration = {LIGO Scientific, VIRGO},
+  note = {[Erratum: Phys.Rev.Lett. 121, 129901 (2018)]},
+  number = {22},
+  pages = {221101},
+  reportnumber = {LIGO-P170104},
+  volume = {118}
+}
+
+@article{Abbott2017GW170817Observation,
+  author = {Abbott, B. P. and others},
+  title = {GW170817: Observation of Gravitational Waves from a Binary Neutron Star Inspiral},
+  journal = {Phys. Rev. Lett.},
+  archiveprefix = {arXiv},
+  eprint = {1710.05832},
+  primaryclass = {gr-qc},
+  doi = {10.1103/PhysRevLett.119.161101},
+  year = {2017},
+  collaboration = {LIGO Scientific, Virgo},
+  number = {16},
+  pages = {161101},
+  reportnumber = {LIGO-P170817},
+  volume = {119}
+}
+
+@article{Abbott2017SearchFor,
+  author = {Abbott, Benjamin P. and others},
+  title = {Search for gravitational waves from Scorpius X-1 in the first Advanced LIGO observing run with a hidden Markov model},
+  journal = {Phys. Rev. D},
+  archiveprefix = {arXiv},
+  eprint = {1704.03719},
+  primaryclass = {gr-qc},
+  doi = {10.1103/PhysRevD.95.122003},
+  year = {2017},
+  collaboration = {LIGO Scientific, VIRGO},
+  number = {12},
+  pages = {122003},
+  reportnumber = {LIGO-P1700019; erratum LIGO-P2100372},
+  volume = {95}
+}
+
+@article{Abbott2017SearchFora,
+  author = {Abbott, Benjamin P. and others},
+  title = {Search for intermediate mass black hole binaries in the first observing run of Advanced LIGO},
+  journal = {Phys. Rev. D},
+  archiveprefix = {arXiv},
+  eprint = {1704.04628},
+  primaryclass = {gr-qc},
+  doi = {10.1103/PhysRevD.96.022001},
+  year = {2017},
+  collaboration = {LIGO Scientific, Virgo},
+  number = {2},
+  pages = {022001},
+  volume = {96}
+}
+
+@article{Abbott2018ConstraintsOn,
+  author = {Abbott, B. P. and others},
+  title = {Constraints on cosmic strings using data from the first Advanced LIGO observing run},
+  journal = {Phys. Rev. D},
+  archiveprefix = {arXiv},
+  eprint = {1712.01168},
+  primaryclass = {gr-qc},
+  doi = {10.1103/PhysRevD.97.102002},
+  year = {2018},
+  collaboration = {LIGO Scientific, Virgo},
+  number = {10},
+  pages = {102002},
+  volume = {97}
+}
+
+@article{Abbott2018FirstSearch,
+  author = {Abbott, Benjamin P. and others},
+  title = {First search for nontensorial gravitational waves from known pulsars},
+  journal = {Phys. Rev. Lett.},
+  archiveprefix = {arXiv},
+  eprint = {1709.09203},
+  primaryclass = {gr-qc},
+  doi = {10.1103/PhysRevLett.120.031104},
+  year = {2018},
+  collaboration = {LIGO Scientific, Virgo},
+  number = {3},
+  pages = {031104},
+  reportnumber = {LIGO-P1700009},
+  volume = {120}
+}
+
+@article{Abbott2018FullBand,
+  author = {Abbott, Benjamin P. and others},
+  title = {Full Band All-sky Search for Periodic Gravitational Waves in the O1 LIGO Data},
+  journal = {Phys. Rev. D},
+  archiveprefix = {arXiv},
+  eprint = {1802.05241},
+  primaryclass = {gr-qc},
+  doi = {10.1103/PhysRevD.97.102003},
+  year = {2018},
+  collaboration = {LIGO Scientific, Virgo},
+  number = {10},
+  pages = {102003},
+  volume = {97}
+}
+
+@article{Abbott2018GW170817Implications,
+  author = {Abbott, Benjamin P. and others},
+  title = {GW170817: Implications for the Stochastic Gravitational-Wave Background from Compact Binary Coalescences},
+  journal = {Phys. Rev. Lett.},
+  archiveprefix = {arXiv},
+  eprint = {1710.05837},
+  primaryclass = {gr-qc},
+  doi = {10.1103/PhysRevLett.120.091101},
+  year = {2018},
+  collaboration = {LIGO Scientific, Virgo},
+  number = {9},
+  pages = {091101},
+  reportnumber = {LIGO-P1700272},
+  volume = {120}
+}
+
+@article{Abbott2018SearchFor,
+  author = {Abbott, Benjamin P. and others},
+  title = {Search for Tensor, Vector, and Scalar Polarizations in the Stochastic Gravitational-Wave Background},
+  journal = {Phys. Rev. Lett.},
+  archiveprefix = {arXiv},
+  eprint = {1802.10194},
+  primaryclass = {gr-qc},
+  doi = {10.1103/PhysRevLett.120.201102},
+  year = {2018},
+  collaboration = {LIGO Scientific, Virgo},
+  number = {20},
+  pages = {201102},
+  volume = {120}
+}
+
+@article{Carullo2018EmpiricalTests,
+  author = {Carullo, Gregorio and others},
+  title = {Empirical tests of the black hole no-hair conjecture using gravitational-wave observations},
+  journal = {Phys. Rev. D},
+  archiveprefix = {arXiv},
+  eprint = {1805.04760},
+  primaryclass = {gr-qc},
+  doi = {10.1103/PhysRevD.98.104020},
+  year = {2018},
+  number = {10},
+  pages = {104020},
+  volume = {98}
+}
+
+@article{Lai2018DiscoveringIntermediateMass,
+  author = {Lai, Kwun-Hang and Hannuksela, Otto A. and Herrera-Mart{\'\i}n, Antonio and Diego, Jose M. and Broadhurst, Tom and Li, Tjonnie G. F.},
+  title = {Discovering intermediate-mass black hole lenses through gravitational wave lensing},
+  journal = {Phys. Rev. D},
+  archiveprefix = {arXiv},
+  eprint = {1801.07840},
+  primaryclass = {gr-qc},
+  doi = {10.1103/PhysRevD.98.083005},
+  year = {2018},
+  number = {8},
+  pages = {083005},
+  volume = {98}
+}
+
+@article{Singh2018ClassifyingLensed,
+  author = {Singh, Amit Jit and Li, Ivan S. C. and Hannuksela, Otto A. and Li, Tjonnie G. F. and Kim, Kyungmin},
+  title = {Classifying Lensed Gravitational Waves in the Geometrical Optics Limit with Machine Learning},
+  archiveprefix = {arXiv},
+  eprint = {1810.07888},
+  primaryclass = {astro-ph.IM},
+  doi = {10.33697/ajur.2019.019},
+  year = {2018},
+  month = {10}
+}
+
+@article{Hannuksela2019ProbingThe,
+  author = {Hannuksela, Otto A. and Wong, Kaze W. K. and Brito, Richard and Berti, Emanuele and Li, Tjonnie G. F.},
+  title = {Probing the existence of ultralight bosons with a single gravitational-wave measurement},
+  journal = {Nature Astron.},
+  archiveprefix = {arXiv},
+  eprint = {1804.09659},
+  primaryclass = {astro-ph.HE},
+  doi = {10.1038/s41550-019-0712-4},
+  year = {2019},
+  number = {5},
+  pages = {447--451},
+  volume = {3}
+}
+
+@article{Abbott2020AGuide,
+  author = {Abbott, Benjamin P and others},
+  title = {A guide to LIGO{\textendash}Virgo detector noise and extraction of transient gravitational-wave signals},
+  journal = {Class. Quant. Grav.},
+  archiveprefix = {arXiv},
+  eprint = {1908.11170},
+  primaryclass = {gr-qc},
+  doi = {10.1088/1361-6382/ab685e},
+  year = {2020},
+  collaboration = {LIGO Scientific, Virgo},
+  number = {5},
+  pages = {055002},
+  volume = {37}
+}
+
+@article{Abbott2020ModelComparison,
+  author = {Abbott, Benjamin P and others},
+  title = {Model comparison from LIGO{\textendash}Virgo data on GW170817{\textquoteright}s binary components and consequences for the merger remnant},
+  journal = {Class. Quant. Grav.},
+  archiveprefix = {arXiv},
+  eprint = {1908.01012},
+  primaryclass = {gr-qc},
+  doi = {10.1088/1361-6382/ab5f7c},
+  year = {2020},
+  collaboration = {LIGO Scientific, Virgo},
+  number = {4},
+  pages = {045006},
+  reportnumber = {LIGO-P1800379},
+  volume = {37}
+}
+
+@article{Hannuksela2020ExtremeDark,
+  author = {Hannuksela, Otto A. and Ng, Kenny C. Y. and Li, Tjonnie G. F.},
+  title = {Extreme dark matter tests with extreme mass ratio inspirals},
+  journal = {Phys. Rev. D},
+  archiveprefix = {arXiv},
+  eprint = {1906.11845},
+  primaryclass = {astro-ph.CO},
+  doi = {10.1103/PhysRevD.102.103022},
+  year = {2020},
+  number = {10},
+  pages = {103022},
+  volume = {102}
+}
+
+@article{Hannuksela2020LocalizingMerging,
+  author = {Hannuksela, Otto A. and Collett, Thomas E. and {\c{C}}al{\i}{\c{s}}kan, Mesut and Li, Tjonnie G. F.},
+  title = {Localizing merging black holes with sub-arcsecond precision using gravitational-wave lensing},
+  journal = {Mon. Not. Roy. Astron. Soc.},
+  archiveprefix = {arXiv},
+  eprint = {2004.13811},
+  primaryclass = {astro-ph.HE},
+  doi = {10.1093/mnras/staa2577},
+  year = {2020},
+  number = {3},
+  pages = {3395--3402},
+  volume = {498}
+}
+
+@article{Pagano2020LensingGWA,
+  author = {Pagano, Giulia and Hannuksela, Otto A. and Li, Tjonnie G. F.},
+  title = {lensingGW: a Python package for lensing of gravitational waves},
+  journal = {Astron. Astrophys.},
+  archiveprefix = {arXiv},
+  eprint = {2006.12879},
+  primaryclass = {astro-ph.CO},
+  doi = {10.1051/0004-6361/202038730},
+  year = {2020},
+  pages = {A167},
+  volume = {643}
+}
+
+@article{Pang2020LensedOr,
+  author = {Pang, Peter T. H. and Hannuksela, Otto A. and Dietrich, Tim and Pagano, Giulia and Harry, Ian W.},
+  title = {Lensed or not lensed: determining lensing magnifications for binary neutron star mergers from a single detection},
+  journal = {Mon. Not. Roy. Astron. Soc.},
+  archiveprefix = {arXiv},
+  eprint = {2002.04893},
+  primaryclass = {astro-ph.HE},
+  doi = {10.1093/mnras/staa1430},
+  year = {2020},
+  number = {4},
+  pages = {3740--3750},
+  volume = {495}
+}
+
+@article{Abbott2021OpenData,
+  author = {Abbott, Rich and others},
+  title = {Open data from the first and second observing runs of Advanced LIGO and Advanced Virgo},
+  journal = {SoftwareX},
+  archiveprefix = {arXiv},
+  eprint = {1912.11716},
+  primaryclass = {gr-qc},
+  doi = {10.1016/j.softx.2021.100658},
+  year = {2021},
+  collaboration = {LIGO Scientific, Virgo},
+  pages = {100658},
+  reportnumber = {LIGO-P1900206},
+  volume = {13}
+}
+
+@article{Baltus2021ConvolutionalNeural,
+  author = {Baltus, Gregory and Janquart, Justin and Lopez, Melissa and Reza, Amit and Caudill, Sarah and Cudell, Jean-Rene},
+  title = {Convolutional neural networks for the detection of the early inspiral of a gravitational-wave signal},
+  journal = {Phys. Rev. D},
+  archiveprefix = {arXiv},
+  eprint = {2104.00594},
+  primaryclass = {gr-qc},
+  doi = {10.1103/PhysRevD.103.102003},
+  year = {2021},
+  pages = {102003},
+  reportnumber = {LIGO DCC number LIGO-P2100087},
+  volume = {103}
+}
+
+@inproceedings{Baltus2021DetectingThe,
+  author = {Baltus, Gr{\'e}gory and Cudell, Jean-Ren{\'e} and Janquart, Justin and Lopez, Melissa and Caudill, Sarah and Reza, Amit},
+  title = {Detecting the early inspiral of a gravitational-wave signal with convolutional neural networks},
+  archiveprefix = {arXiv},
+  eprint = {2105.13664},
+  primaryclass = {gr-qc},
+  doi = {10.1109/CBMI50038.2021.9461919},
+  year = {2021},
+  month = {5}
+}
+
+@article{Cheung2021StellarMassMicrolensing,
+  author = {Cheung, Mark H. Y. and Gais, Joseph and Hannuksela, Otto A. and Li, Tjonnie G. F.},
+  title = {Stellar-mass microlensing of gravitational waves},
+  journal = {Mon. Not. Roy. Astron. Soc.},
+  archiveprefix = {arXiv},
+  eprint = {2012.07800},
+  primaryclass = {astro-ph.HE},
+  doi = {10.1093/mnras/stab579},
+  year = {2021},
+  number = {3},
+  pages = {3326--3336},
+  volume = {503}
+}
+
+@article{Janquart2021AFast,
+  author = {Janquart, Justin and Hannuksela, Otto A. and K., Haris and Van Den Broeck, Chris},
+  title = {A fast and precise methodology to search for and analyse strongly lensed gravitational-wave events},
+  journal = {Mon. Not. Roy. Astron. Soc.},
+  archiveprefix = {arXiv},
+  eprint = {2105.04536},
+  primaryclass = {gr-qc},
+  doi = {10.1093/mnras/stab1991},
+  year = {2021},
+  number = {4},
+  pages = {5430--5438},
+  volume = {506}
+}
+
+@article{Janquart2021OnThe,
+  author = {Janquart, Justin and Seo, Eungwang and Hannuksela, Otto A. and Li, Tjonnie G. F. and Broeck, Chris Van Den},
+  title = {On the Identification of Individual Gravitational-wave Image Types of a Lensed System Using Higher-order Modes},
+  journal = {Astrophys. J. Lett.},
+  archiveprefix = {arXiv},
+  eprint = {2110.06873},
+  primaryclass = {gr-qc},
+  doi = {10.3847/2041-8213/ac3bcf},
+  year = {2021},
+  number = {1},
+  pages = {L1},
+  volume = {923}
+}
+
+@article{Kim2021IdentificationOf,
+  author = {Kim, Kyungmin and Lee, Joongoo and Yuen, Robin S. H. and Hannuksela, Otto Akseli and Li, Tjonnie G. F.},
+  title = {Identification of Lensed Gravitational Waves with Deep Learning},
+  journal = {Astrophys. J.},
+  archiveprefix = {arXiv},
+  eprint = {2010.12093},
+  primaryclass = {gr-qc},
+  doi = {10.3847/1538-4357/ac0143},
+  year = {2021},
+  number = {2},
+  pages = {119},
+  reportnumber = {LIGO-P2000364},
+  volume = {915}
+}
+
+@article{Ng2021ConstraintsOn,
+  author = {Ng, Ken K. Y. and Vitale, Salvatore and Hannuksela, Otto A. and Li, Tjonnie G. F.},
+  title = {Constraints on Ultralight Scalar Bosons within Black Hole Spin Measurements from the LIGO-Virgo GWTC-2},
+  journal = {Phys. Rev. Lett.},
+  archiveprefix = {arXiv},
+  eprint = {2011.06010},
+  primaryclass = {gr-qc},
+  doi = {10.1103/PhysRevLett.126.151102},
+  year = {2021},
+  number = {15},
+  pages = {151102},
+  volume = {126}
+}
+
+@article{Ng2021SearchingFor,
+  author = {Ng, Ken K. Y. and Hannuksela, Otto A. and Vitale, Salvatore and Li, Tjonnie G. F.},
+  title = {Searching for ultralight bosons within spin measurements of a population of binary black hole mergers},
+  journal = {Phys. Rev. D},
+  archiveprefix = {arXiv},
+  eprint = {1908.02312},
+  primaryclass = {gr-qc},
+  doi = {10.1103/PhysRevD.103.063010},
+  year = {2021},
+  number = {6},
+  pages = {063010},
+  volume = {103}
+}
+
+@article{Samajdar2021BiasesIn,
+  author = {Samajdar, Anuradha and Janquart, Justin and Van Den Broeck, Chris and Dietrich, Tim},
+  title = {Biases in parameter estimation from overlapping gravitational-wave signals in the third-generation detector era},
+  journal = {Phys. Rev. D},
+  archiveprefix = {arXiv},
+  eprint = {2102.07544},
+  primaryclass = {gr-qc},
+  doi = {10.1103/PhysRevD.104.044003},
+  year = {2021},
+  number = {4},
+  pages = {044003},
+  volume = {104}
+}
+
+@article{Shan2021LensingMagnification,
+  author = {Shan, Xikai and Wei, Chengliang and Hu, Bin},
+  title = {Lensing magnification: gravitational waves from coalescing stellar-mass binary black holes},
+  journal = {Mon. Not. Roy. Astron. Soc.},
+  archiveprefix = {arXiv},
+  eprint = {2012.08381},
+  primaryclass = {astro-ph.CO},
+  doi = {10.1093/mnras/stab2567},
+  year = {2021},
+  number = {1},
+  pages = {1253--1261},
+  volume = {508}
+}
+
+@article{Wierda2021BeyondThe,
+  author = {Wierda, A. Renske A. C. and Wempe, Ewoud and Hannuksela, Otto A. and Koopmans, L. {\'e}on V. E. and Van Den Broeck, Chris},
+  title = {Beyond the Detector Horizon: Forecasting Gravitational-Wave Strong Lensing},
+  journal = {Astrophys. J.},
+  archiveprefix = {arXiv},
+  eprint = {2106.06303},
+  primaryclass = {astro-ph.HE},
+  doi = {10.3847/1538-4357/ac1bb4},
+  year = {2021},
+  number = {2},
+  pages = {154},
+  volume = {921}
+}
+
+@article{Abbott2022SearchFor,
+  author = {Abbott, Rich and others},
+  title = {Search for intermediate-mass black hole binaries in the third observing run of Advanced LIGO and Advanced Virgo},
+  journal = {Astron. Astrophys.},
+  archiveprefix = {arXiv},
+  eprint = {2105.15120},
+  primaryclass = {astro-ph.HE},
+  doi = {10.1051/0004-6361/202141452},
+  year = {2022},
+  collaboration = {LIGO Scientific, VIRGO, KAGRA},
+  pages = {A84},
+  reportnumber = {LIGO-P2100025},
+  volume = {659}
+}
+
+@article{Baltus2022ConvolutionalNeural,
+  author = {Baltus, Gr{\'e}gory and Janquart, Justin and Lopez, Melissa and Narola, Harsh and Cudell, Jean-Ren{\'e}},
+  title = {Convolutional neural network for gravitational-wave early alert: Going down in frequency},
+  journal = {Phys. Rev. D},
+  archiveprefix = {arXiv},
+  eprint = {2205.04750},
+  primaryclass = {gr-qc},
+  doi = {10.1103/PhysRevD.106.042002},
+  year = {2022},
+  number = {4},
+  pages = {042002},
+  volume = {106}
+}
+
+@article{Cheung2022TestingThe,
+  author = {Cheung, Damon H. T. and Wong, Kaze W. K. and Hannuksela, Otto A. and Li, Tjonnie G. F. and Ho, Shirley},
+  title = {Testing the robustness of simulation-based gravitational-wave population inference},
+  journal = {Phys. Rev. D},
+  archiveprefix = {arXiv},
+  eprint = {2112.06707},
+  primaryclass = {astro-ph.IM},
+  doi = {10.1103/PhysRevD.106.083014},
+  year = {2022},
+  number = {8},
+  pages = {083014},
+  volume = {106}
+}
+
+@article{Gupta2022DeterminingThe,
+  author = {Gupta, Pawan Kumar and Puecher, Anna and Pang, Peter T. H. and Janquart, Justin and Koekoek, Gideon and Broeck Van Den, Chris},
+  title = {Determining the equation of state of neutron stars with Einstein Telescope using tidal effects and r-mode excitations from a population of binary inspirals},
+  archiveprefix = {arXiv},
+  eprint = {2205.01182},
+  primaryclass = {gr-qc},
+  year = {2022},
+  month = {5}
+}
+
+@inproceedings{Janquart2022GOLUMA,
+  author = {Janquart, Justin and Hannuksela, Otto A. and Haris, K. and Van den Broeck, Chris},
+  title = {GOLUM: A fast and precise methodology to search for, and analyze, strongly lensed gravitational-wave events},
+  booktitle = {56th Rencontres de Moriond on Gravitation},
+  archiveprefix = {arXiv},
+  eprint = {2203.06444},
+  primaryclass = {gr-qc},
+  year = {2022},
+  month = {3}
+}
+
+@article{Janquart2022OrderingThe,
+  author = {Janquart, Justin and More, Anupreeta and Van Den Broeck, Chris},
+  title = {Ordering the confusion: a study of the impact of lens models on gravitational-wave strong lensing detection capabilities},
+  journal = {Mon. Not. Roy. Astron. Soc.},
+  archiveprefix = {arXiv},
+  eprint = {2205.11499},
+  primaryclass = {gr-qc},
+  doi = {10.1093/mnras/stac3660},
+  year = {2022},
+  number = {2},
+  pages = {2046--2059},
+  volume = {519}
+}
+
+@article{Kim2022DeepLearningTextendashBased,
+  author = {Kim, Kyungmin and Lee, Joongoo and Hannuksela, Otto A. and Li, Tjonnie G. F.},
+  title = {Deep Learning{\textendash}based Search for Microlensing Signature from Binary Black Hole Events in GWTC-1 and -2},
+  journal = {Astrophys. J.},
+  archiveprefix = {arXiv},
+  eprint = {2206.08234},
+  primaryclass = {gr-qc},
+  doi = {10.3847/1538-4357/ac92f3},
+  year = {2022},
+  number = {2},
+  pages = {157},
+  reportnumber = {LIGO-P2200006},
+  volume = {938}
+}
+
+@article{Kolmus2022FastSky,
+  author = {Kolmus, Alex and Baltus, Gr{\'e}gory and Janquart, Justin and van Laarhoven, Twan and Caudill, Sarah and Heskes, Tom},
+  title = {Fast sky localization of gravitational waves using deep learning seeded importance sampling},
+  journal = {Phys. Rev. D},
+  archiveprefix = {arXiv},
+  eprint = {2111.00833},
+  primaryclass = {gr-qc},
+  doi = {10.1103/PhysRevD.106.023032},
+  year = {2022},
+  number = {2},
+  pages = {023032},
+  volume = {106}
+}
+
+@article{Seo2022ImprovingDetection,
+  author = {Seo, Eungwang and Hannuksela, Otto A. and Li, Tjonnie G. F.},
+  title = {Improving Detection of Gravitational-wave Microlensing Using Repeated Signals Induced by Strong Lensing},
+  journal = {Astrophys. J.},
+  archiveprefix = {arXiv},
+  eprint = {2110.03308},
+  primaryclass = {astro-ph.HE},
+  doi = {10.3847/1538-4357/ac6dea},
+  year = {2022},
+  number = {1},
+  pages = {50},
+  volume = {932}
+}
+
+@article{Branchesi2023ScienceWith,
+  author = {Branchesi, Marica and others},
+  title = {Science with the Einstein Telescope: a comparison of different designs},
+  journal = {JCAP},
+  archiveprefix = {arXiv},
+  eprint = {2303.15923},
+  primaryclass = {gr-qc},
+  doi = {10.1088/1475-7516/2023/07/068},
+  year = {2023},
+  pages = {068},
+  reportnumber = {ET-0084A-23},
+  volume = {07}
+}
+
+@article{CCAlICSKan2023LensingOr,
+  author = {{\c{C}}al{\i}{\c{s}}kan, Mesut and Ezquiaga, Jose Mar{\'\i}a and Hannuksela, Otto A. and Holz, Daniel E.},
+  title = {Lensing or luck? False alarm probabilities for gravitational lensing of gravitational waves},
+  journal = {Phys. Rev. D},
+  archiveprefix = {arXiv},
+  eprint = {2201.04619},
+  primaryclass = {astro-ph.CO},
+  doi = {10.1103/PhysRevD.107.063023},
+  year = {2023},
+  number = {6},
+  pages = {063023},
+  volume = {107}
+}
+
+@article{Evans2023CosmicExplorer,
+  author = {Evans, Matthew and others},
+  title = {Cosmic Explorer: A Submission to the NSF MPSAC ngGW Subcommittee},
+  archiveprefix = {arXiv},
+  eprint = {2306.13745},
+  primaryclass = {astro-ph.IM},
+  year = {2023},
+  month = {6}
+}
+
+@article{Janquart2023AnalysesOf,
+  author = {Janquart, Justin and Baka, Tomasz and Samajdar, Anuradha and Dietrich, Tim and Van Den Broeck, Chris},
+  title = {Analyses of overlapping gravitational wave signals using hierarchical subtraction and joint parameter estimation},
+  journal = {Mon. Not. Roy. Astron. Soc.},
+  archiveprefix = {arXiv},
+  eprint = {2211.01304},
+  primaryclass = {gr-qc},
+  doi = {10.1093/mnras/stad1542},
+  year = {2023},
+  number = {2},
+  pages = {1699--1710},
+  volume = {523}
+}
+
+@article{Janquart2023FollowUpAnalyses,
+  author = {Janquart, Justin and others},
+  title = {Follow-up analyses to the O3 LIGO{\textendash}Virgo{\textendash}KAGRA lensing searches},
+  journal = {Mon. Not. Roy. Astron. Soc.},
+  archiveprefix = {arXiv},
+  eprint = {2306.03827},
+  primaryclass = {gr-qc},
+  doi = {10.1093/mnras/stad2909},
+  year = {2023},
+  number = {3},
+  pages = {3832--3860},
+  volume = {526}
+}
+
+@phdthesis{Janquart2023FromEinstein,
+  author = {Janquart, Justin},
+  title = {From Einstein to Einstein Telescope: From Testing Predictions to Addressing Future Challenges},
+  year = {2023}
+}
+
+@article{Janquart2023TheReturn,
+  author = {Janquart, Justin and Haris, K. and Hannuksela, Otto A. and Van Den Broeck, Chris},
+  title = {The return of GOLUM: improving distributed joint parameter estimation for strongly lensed gravitational waves},
+  journal = {Mon. Not. Roy. Astron. Soc.},
+  archiveprefix = {arXiv},
+  eprint = {2304.12148},
+  primaryclass = {gr-qc},
+  doi = {10.1093/mnras/stad2838},
+  year = {2023},
+  number = {2},
+  pages = {3088--3098},
+  volume = {526}
+}
+
+@article{Langendorff2023NormalizingFlows,
+  author = {Langendorff, Jurriaan and Kolmus, Alex and Janquart, Justin and Van Den Broeck, Chris},
+  title = {Normalizing Flows as an Avenue to Studying Overlapping Gravitational Wave Signals},
+  journal = {Phys. Rev. Lett.},
+  archiveprefix = {arXiv},
+  eprint = {2211.15097},
+  primaryclass = {gr-qc},
+  doi = {10.1103/PhysRevLett.130.171402},
+  year = {2023},
+  number = {17},
+  pages = {171402},
+  volume = {130}
+}
+
+@article{Liu2023ExploringThe,
+  author = {Liu, Anna and Wong, Isaac C. F. and Leong, Samson H. W. and More, Anupreeta and Hannuksela, Otto A. and Li, Tjonnie G. F.},
+  title = {Exploring the hidden Universe: a novel phenomenological approach for recovering arbitrary gravitational-wave millilensing configurations},
+  journal = {Mon. Not. Roy. Astron. Soc.},
+  archiveprefix = {arXiv},
+  eprint = {2302.09870},
+  primaryclass = {gr-qc},
+  doi = {10.1093/mnras/stad1302},
+  year = {2023},
+  number = {3},
+  pages = {4149--4160},
+  volume = {525}
+}
+
+@article{Shan2023WaveEffect,
+  author = {Shan, Xikai and Li, Guoliang and Chen, Xuechun and Zheng, Wenwen and Zhao, Wen},
+  title = {Wave effect of gravitational waves intersected with a microlens field: A new algorithm and supplementary study},
+  journal = {Sci. China Phys. Mech. Astron.},
+  archiveprefix = {arXiv},
+  eprint = {2208.13566},
+  primaryclass = {astro-ph.CO},
+  doi = {10.1007/s11433-022-1985-3},
+  year = {2023},
+  number = {3},
+  pages = {239511},
+  volume = {66}
+}
+
+@article{Wright2023DeterminationOf,
+  author = {Wright, Mick and Janquart, Justin and Hendry, Martin},
+  title = {Determination of Lens Mass Density Profile from Strongly Lensed Gravitational-wave Signals},
+  journal = {Astrophys. J.},
+  archiveprefix = {arXiv},
+  eprint = {2307.07852},
+  primaryclass = {astro-ph.HE},
+  doi = {10.3847/1538-4357/ad0891},
+  year = {2023},
+  number = {2},
+  pages = {70},
+  volume = {959}
+}
+
+@article{Wu2023ReducingThe,
+  author = {Wu, Zhao-Feng and Chan, Lok W. L. and Hendry, Martin and Hannuksela, Otto A.},
+  title = {Reducing the impact of weak-lensing errors on gravitational-wave standard sirens},
+  journal = {Mon. Not. Roy. Astron. Soc.},
+  archiveprefix = {arXiv},
+  eprint = {2211.15160},
+  primaryclass = {astro-ph.CO},
+  doi = {10.1093/mnras/stad1194},
+  year = {2023},
+  number = {3},
+  pages = {4059--4077},
+  volume = {522}
+}
+
+@article{Yeung2023DetectabilityOf,
+  author = {Yeung, Simon M. C. and Cheung, Mark H. Y. and Seo, Eungwang and Gais, Joseph A. J. and Hannuksela, Otto A. and Li, Tjonnie G. F.},
+  title = {Detectability of microlensed gravitational waves},
+  journal = {Mon. Not. Roy. Astron. Soc.},
+  archiveprefix = {arXiv},
+  eprint = {2112.07635},
+  primaryclass = {gr-qc},
+  doi = {10.1093/mnras/stad2772},
+  year = {2023},
+  number = {2},
+  pages = {2230--2240},
+  volume = {526}
+}
+
+@article{Chan2024ExtractingUltralight,
+  author = {Chan, Kelvin H. M. and Hannuksela, Otto A.},
+  title = {Extracting ultralight boson properties from boson clouds around postmerger remnants},
+  journal = {Phys. Rev. D},
+  archiveprefix = {arXiv},
+  eprint = {2209.03536},
+  primaryclass = {gr-qc},
+  doi = {10.1103/PhysRevD.109.023009},
+  year = {2024},
+  number = {2},
+  pages = {023009},
+  volume = {109}
+}
+
+@article{Gupta2024CharacterizingGravitational,
+  author = {Gupta, Ish and others},
+  title = {Characterizing gravitational wave detector networks: from A$^\sharp$ to cosmic explorer},
+  journal = {Class. Quant. Grav.},
+  archiveprefix = {arXiv},
+  eprint = {2307.10421},
+  primaryclass = {gr-qc},
+  doi = {10.1088/1361-6382/ad7b99},
+  year = {2024},
+  number = {24},
+  pages = {245001},
+  reportnumber = {CE Document No. P2300019, CE Document No. P2300019-v2},
+  volume = {41}
+}
+
+@article{Gupta2024PossibleCauses,
+  author = {Gupta, Anuradha and others},
+  title = {Possible causes of false general relativity violations in gravitational wave observations},
+  archiveprefix = {arXiv},
+  eprint = {2405.02197},
+  primaryclass = {gr-qc},
+  doi = {10.21468/SciPostPhysCommRep.5},
+  year = {2024},
+  month = {5}
+}
+
+@article{Kolmus2024TuningNeural,
+  author = {Kolmus, Alex and Janquart, Justin and Baka, Tomasz and van Laarhoven, Twan and Van Den Broeck, Chris and Heskes, Tom},
+  title = {Tuning neural posterior estimation for gravitational wave inference},
+  archiveprefix = {arXiv},
+  eprint = {2403.02443},
+  primaryclass = {astro-ph.IM},
+  year = {2024},
+  month = {3}
+}
+
+@article{Narola2024GravitationalWaveParameter,
+  author = {Narola, Harsh and Janquart, Justin and Meijer, Quirijn and Haris, K. and Van Den Broeck, Chris},
+  title = {Gravitational-wave parameter estimation with relative binning: Inclusion of higher-order modes and precession, and applications to lensing and third-generation detectors},
+  journal = {Phys. Rev. D},
+  archiveprefix = {arXiv},
+  eprint = {2308.12140},
+  primaryclass = {gr-qc},
+  doi = {10.1103/PhysRevD.110.084085},
+  year = {2024},
+  number = {8},
+  pages = {084085},
+  volume = {110}
+}
+
+@article{Narola2024HowWell,
+  author = {Narola, Harsh and Janquart, Justin and Haegel, Le{\"\i}la and Haris, K. and Hannuksela, Otto A. and Van Den Broeck, Chris},
+  title = {How well can modified gravitational wave propagation be constrained with strong lensing?},
+  journal = {Phys. Rev. D},
+  archiveprefix = {arXiv},
+  eprint = {2308.01709},
+  primaryclass = {gr-qc},
+  doi = {10.1103/PhysRevD.109.084064},
+  year = {2024},
+  number = {8},
+  pages = {084064},
+  volume = {109}
+}
+
+@article{Ng2024InferringCosmology,
+  author = {Ng, Thomas C. K. and Rinaldi, Stefano and Hannuksela, Otto A.},
+  title = {Inferring cosmology from gravitational waves using non-parametric detector-frame mass distribution},
+  archiveprefix = {arXiv},
+  eprint = {2410.23541},
+  primaryclass = {gr-qc},
+  year = {2024},
+  month = {10},
+  reportnumber = {LIGO-P2400509}
+}
+
+@article{Phurailatpam2024GwsnrA,
+  author = {Phurailatpam, Hemantakumar and Hannuksela, Otto Akseli},
+  title = {gwsnr: A Python package for efficient signal-to-noise ratio calculations of gravitational waves},
+  archiveprefix = {arXiv},
+  eprint = {2412.09888},
+  primaryclass = {astro-ph.IM},
+  year = {2024},
+  month = {12}
+}
+
+@article{Phurailatpam2024LerLVK,
+  author = {Phurailatpam, Hemantakumar and More, Anupreeta and Narola, Harsh and Yin, Ng Chung and Janquart, Justin and Van Den Broeck, Chris and Hannuksela, Otto Akseli and Singh, Neha and Keitel, David},
+  title = {ler: LVK (LIGO-Virgo-KAGRA collaboration) event (compact-binary mergers) rate calculator and simulator},
+  archiveprefix = {arXiv},
+  eprint = {2407.07526},
+  primaryclass = {astro-ph.IM},
+  year = {2024},
+  month = {7}
+}
+
+@article{Poon2024GalaxyLens,
+  author = {Poon, Jason S. C. and Rinaldi, Stefano and Janquart, Justin and Narola, Harsh and Hannuksela, Otto A.},
+  title = {Galaxy lens reconstruction based on strongly lensed gravitational waves: similarity transformation degeneracy and mass-sheet degeneracy},
+  journal = {Mon. Not. Roy. Astron. Soc.},
+  archiveprefix = {arXiv},
+  eprint = {2406.06463},
+  primaryclass = {astro-ph.HE},
+  doi = {10.1093/mnras/stae2660},
+  year = {2024},
+  number = {3},
+  pages = {2212--2233},
+  volume = {536}
+}
+
+@article{Rinaldi2024HierarchicalInference,
+  author = {Rinaldi, Stefano and Demasi, Gabriele and Del Pozzo, Walter and Hannuksela, Otto A.},
+  title = {Hierarchical inference of evidence using posterior samples},
+  archiveprefix = {arXiv},
+  eprint = {2405.07504},
+  primaryclass = {stat.ME},
+  year = {2024},
+  month = {5}
+}
+
+@article{Shan2024MicrolensingBias,
+  author = {Shan, Xikai and Chen, Xuechun and Hu, Bin and Li, Guoliang},
+  title = {Microlensing bias on the detection of strong lensing gravitational wave},
+  journal = {Sci. China Phys. Mech. Astron.},
+  archiveprefix = {arXiv},
+  eprint = {2306.14796},
+  primaryclass = {astro-ph.CO},
+  doi = {10.1007/s11433-023-2334-9},
+  year = {2024},
+  number = {6},
+  pages = {269511},
+  volume = {67}
+}
+
+@article{VanStraalen2024PreMergerDetection,
+  author = {van Straalen, Wouter and Kolmus, Alex and Janquart, Justin and Van Den Broeck, Chris},
+  title = {Pre-Merger Detection and Characterization of Inspiraling Binary Neutron Stars Derived from Neural Posterior Estimation},
+  archiveprefix = {arXiv},
+  eprint = {2407.10263},
+  primaryclass = {gr-qc},
+  year = {2024},
+  month = {7}
+}
+
+@article{Wempe2024OnThe,
+  author = {Wempe, Ewoud and Koopmans, L{\'e}on V. E. and Wierda, A. Renske A. C. and Hannuksela, Otto Akseli and van den Broeck, Chris},
+  title = {On the detection and precise localization of merging black holes events through strong gravitational lensing},
+  journal = {Mon. Not. Roy. Astron. Soc.},
+  archiveprefix = {arXiv},
+  eprint = {2204.08732},
+  primaryclass = {astro-ph.HE},
+  doi = {10.1093/mnras/stae1023},
+  year = {2024},
+  number = {3},
+  pages = {3368--3390},
+  volume = {530}
+}
+
+@article{Yeung2024WolensingA,
+  author = {Yeung, Simon M. C. and Cheung, Mark H. Y. and Zumalacarregui, Miguel and Hannuksela, Otto A.},
+  title = {wolensing: A Python package for computing the amplification factor for gravitational waves with wave-optics effects},
+  archiveprefix = {arXiv},
+  eprint = {2410.19804},
+  primaryclass = {astro-ph.IM},
+  year = {2024},
+  month = {10}
+}
+
+@article{Baka2025OverlappingSignals,
+  author = {Baka, Tomasz and Narola, Harsh and Janquart, Justin and Samajdar, Anuradha and Dietrich, Tim and Van Den Broeck, Chris},
+  title = {Overlapping signals in next-generation gravitational wave observatories: A recipe for selecting the best parameter estimation technique},
+  journal = {Phys. Rev. D},
+  archiveprefix = {arXiv},
+  eprint = {2507.10304},
+  primaryclass = {gr-qc},
+  doi = {10.1103/8cwp-mxcd},
+  year = {2025},
+  number = {8},
+  pages = {082001},
+  volume = {112}
+}
+
+@article{Cao2025UltrahighEnergyGammaRay,
+  author = {Cao, Zhen and others},
+  title = {Ultrahigh-energy gamma-ray emission associated with black hole{\textendash}jet systems},
+  journal = {Natl. Sci. Rev.},
+  archiveprefix = {arXiv},
+  eprint = {2410.08988},
+  primaryclass = {astro-ph.HE},
+  doi = {10.1093/nsr/nwaf496},
+  year = {2025},
+  collaboration = {LHAASO},
+  number = {12},
+  pages = {nwaf496},
+  volume = {12}
+}
+
+@article{Cheung2025MitigatingThe,
+  author = {Cheung, Damon H. T. and Rinaldi, Stefano and Toscani, Martina and Hannuksela, Otto A.},
+  title = {Mitigating the effect of the population model uncertainty on the strong lensing Bayes factor using nonparametric methods},
+  journal = {Phys. Rev. D},
+  archiveprefix = {arXiv},
+  eprint = {2308.12182},
+  primaryclass = {gr-qc},
+  doi = {10.1103/PhysRevD.111.063012},
+  year = {2025},
+  number = {6},
+  pages = {063012},
+  volume = {111}
+}
+
+@article{Hannuksela2025GravitationalWaveLensing,
+  author = {Hannuksela, Otto Akseli},
+  title = {Gravitational-wave lensing detection},
+  journal = {Phil. Trans. Roy. Soc. Lond. A},
+  doi = {10.1098/rsta.2024.0129},
+  year = {2025},
+  number = {2295},
+  pages = {20240129},
+  volume = {383}
+}
+
+@article{Janquart2025WhatIs,
+  author = {Janquart, Justin and others},
+  title = {What is the nature of GW230529? An exploration of the gravitational lensing hypothesis},
+  journal = {Mon. Not. Roy. Astron. Soc.},
+  archiveprefix = {arXiv},
+  eprint = {2409.07298},
+  primaryclass = {gr-qc},
+  doi = {10.1093/mnras/staf049},
+  year = {2025},
+  number = {2},
+  pages = {1001--1014},
+  reportnumber = {LIGO-P2400353},
+  volume = {537}
+}
+
+@article{Leong2025ConstrainingBinary,
+  author = {Leong, Samson H. W. and Janquart, Justin and Sharma, Aditya Kumar and Martens, Paul and Ajith, Parameswaran and Hannuksela, Otto A.},
+  title = {Constraining Binary Mergers in Active Galactic Nuclei Disks Using the Nonobservation of Lensed Gravitational Waves},
+  journal = {Astrophys. J. Lett.},
+  archiveprefix = {arXiv},
+  eprint = {2408.13144},
+  primaryclass = {astro-ph.HE},
+  doi = {10.3847/2041-8213/ad9ead},
+  year = {2025},
+  number = {2},
+  pages = {L27},
+  reportnumber = {LIGO DCC - P2400346},
+  volume = {979}
+}
+
+@article{Liu2025MillilensingInduced,
+  author = {Liu, Anna and Chandramouli, Rohit S. and Hannuksela, Otto A. and Yunes, Nicol{\'a}s and Li, Tjonnie G. F.},
+  title = {Millilensing induced systematic biases in parametrized tests of general relativity},
+  journal = {Phys. Rev. D},
+  archiveprefix = {arXiv},
+  eprint = {2410.21738},
+  primaryclass = {gr-qc},
+  doi = {10.1103/bsml-2rdh},
+  year = {2025},
+  number = {6},
+  pages = {064043},
+  volume = {112}
+}
+
+@article{Narola2025NullStreamBasedThirdGenerationReady,
+  author = {Narola, Harsh and others},
+  title = {Null-stream-based third-generation-ready glitch mitigation for gravitational wave measurements},
+  journal = {Phys. Rev. D},
+  archiveprefix = {arXiv},
+  eprint = {2411.15506},
+  primaryclass = {gr-qc},
+  doi = {10.1103/l6tp-ykxp},
+  year = {2025},
+  number = {2},
+  pages = {024079},
+  volume = {112}
+}
+
+@article{Ng2025UncoveringFaint,
+  author = {Ng, Leo C. Y. and Janquart, Justin and Phurailatpam, Hemantakumar and Narola, Harsh and Poon, Jason S. C. and Van Den Broeck, Chris and Hannuksela, Otto A.},
+  title = {Uncovering faint lensed gravitational-wave signals and reprioritizing their follow-up analysis using galaxy lensing forecasts with detected counterparts},
+  journal = {Mon. Not. Roy. Astron. Soc.},
+  archiveprefix = {arXiv},
+  eprint = {2403.16532},
+  primaryclass = {gr-qc},
+  doi = {10.1093/mnras/staf874},
+  year = {2025},
+  number = {4},
+  pages = {2937--2951},
+  volume = {540}
+}
+
+@inproceedings{Roy2025ProbingGravitational,
+  author = {Roy, Soumen and Bertrand, Bruno and Janquart, Justin},
+  title = {Probing gravitational waves using GNSS constellations},
+  booktitle = {{59th Rencontres de Moriond on Gravitation}: {Moriond 2025 Gravitation}},
+  archiveprefix = {arXiv},
+  eprint = {2505.21716},
+  primaryclass = {gr-qc},
+  year = {2025},
+  month = {5}
+}
+
+@article{Seo2025ResidualTest,
+  author = {Seo, Eungwang and Shan, Xikai and Janquart, Justin and Hannuksela, Otto A. and Hendry, Martin A. and Hu, Bin},
+  title = {Residual Test to Search for Microlensing Signatures in Strongly Lensed Gravitational Wave Signals},
+  journal = {Astrophys. J.},
+  archiveprefix = {arXiv},
+  eprint = {2503.02186},
+  primaryclass = {gr-qc},
+  doi = {10.3847/1538-4357/ade4bf},
+  year = {2025},
+  number = {2},
+  pages = {159},
+  volume = {988}
+}
+
+@article{Shan2025AnInterferenceBased,
+  author = {Shan, Xikai and Hu, Bin and Chen, Xuechun and Cai, Rong-Gen},
+  title = {An interference-based method for the detection of strongly lensed gravitational waves},
+  journal = {Nature Astron.},
+  archiveprefix = {arXiv},
+  eprint = {2301.06117},
+  primaryclass = {astro-ph.IM},
+  doi = {10.1038/s41550-025-02519-5},
+  year = {2025},
+  number = {6},
+  pages = {916--924},
+  volume = {9}
+}
+
+@article{Shan2025GravitationalLensing,
+  author = {Shan, Xikai and Jin, Yunpeng and Mao, Shude},
+  title = {Gravitational lensing by a spiral galaxy I: the influence from bar's structure to the flux ratio anomaly},
+  archiveprefix = {arXiv},
+  eprint = {2510.02805},
+  primaryclass = {astro-ph.CO},
+  doi = {10.1093/mnras/stag883},
+  year = {2025},
+  month = {10}
+}
+
+@article{Shan2025GW231123A,
+  author = {Shan, Xikai and Yang, Huan and Mao, Shude},
+  title = {GW231123: A Case for Binary Microlensing in a Strong Lensing Field},
+  archiveprefix = {arXiv},
+  eprint = {2512.19118},
+  primaryclass = {astro-ph.GA},
+  year = {2025},
+  month = {12},
+  reportnumber = {LIGO document P2500747}
+}
+
+@article{Shan2025WaveEffect,
+  author = {Shan, Xikai and Li, Guoliang and Chen, Xuechun and Zhao, Wen and Hu, Bin and Mao, Shude},
+  title = {Wave effect of gravitational waves intersected with a microlens field II: An adaptive hierarchical tree algorithm and population study},
+  journal = {Sci. China Phys. Mech. Astron.},
+  archiveprefix = {arXiv},
+  eprint = {2409.06747},
+  primaryclass = {astro-ph.IM},
+  doi = {10.1007/s11433-024-2502-1},
+  year = {2025},
+  number = {1},
+  pages = {219512},
+  volume = {68}
+}
+
+@article{Smith2025MultiMessengerGravitational,
+  author = {Smith, Graham P. and others},
+  title = {Multi-messenger gravitational lensing},
+  journal = {Phil. Trans. Roy. Soc. Lond. A},
+  archiveprefix = {arXiv},
+  eprint = {2503.19973},
+  primaryclass = {astro-ph.HE},
+  doi = {10.1098/rsta.2024.0134},
+  year = {2025},
+  number = {2295},
+  pages = {20240134},
+  volume = {383}
+}
+
+@article{Su2025FromStars,
+  author = {Su, Zhaoqi and Shan, Xikai and Lyu, Zhenwei and Zhang, Junyao and Liu, Yebin and Mao, Shude and Yang, Huan},
+  title = {From Stars to Waves: Non-deterministic Inference of Microlensed Gravitational Waves},
+  archiveprefix = {arXiv},
+  eprint = {2510.17125},
+  primaryclass = {gr-qc},
+  year = {2025},
+  month = {10}
+}
+
+@article{Uronen2025FindingBlack,
+  author = {Uronen, Laura Elina and Li, Tian and Janquart, Justin and Phurailatpam, Hemanta and Poon, Jason S. C. and Wempe, Ewoud and Koopmans, L{\'e}on V. E. and Hannuksela, Otto A.},
+  title = {Finding black holes: an unconventional multi-messenger},
+  journal = {Phil. Trans. Roy. Soc. Lond. A},
+  archiveprefix = {arXiv},
+  eprint = {2406.14257},
+  primaryclass = {astro-ph.HE},
+  doi = {10.1098/rsta.2024.0152},
+  year = {2025},
+  number = {2294},
+  pages = {20240152},
+  volume = {383}
+}
+
+@article{Wright2025EffectOf,
+  author = {Wright, Mick and Janquart, Justin and Johnson-McDaniel, Nathan K.},
+  title = {Effect of Deviations from General Relativity on Searches for Gravitational-wave Microlensing and Type II Strong Lensing},
+  journal = {Astrophys. J.},
+  archiveprefix = {arXiv},
+  eprint = {2403.08957},
+  primaryclass = {gr-qc},
+  doi = {10.3847/1538-4357/ad9d3e},
+  year = {2025},
+  number = {2},
+  pages = {133},
+  volume = {981}
+}
+
+@article{Abac2026TheScience,
+  author = {Abac, Adrian and others},
+  title = {The Science of the Einstein Telescope},
+  journal = {JCAP},
+  archiveprefix = {arXiv},
+  eprint = {2503.12263},
+  primaryclass = {gr-qc},
+  doi = {10.1088/1475-7516/2026/03/081},
+  year = {2026},
+  collaboration = {ET},
+  pages = {081},
+  reportnumber = {ET-0036C-25},
+  volume = {03}
+}
+
+@article{Cheng2026TestingCosmological,
+  author = {Cheng, Brian H. Y. and others},
+  title = {Testing cosmological isotropy with gravitational waves and gamma-ray bursts},
+  archiveprefix = {arXiv},
+  eprint = {2604.17746},
+  primaryclass = {astro-ph.CO},
+  year = {2026},
+  month = {4}
+}
+
+@article{Hannuksela2026StrongGravitationalWave,
+  author = {Hannuksela, Otto A. and Haris, K. and Janquart, Justin and Narola, Harsh and Phurailatpam, Hemantakumar and Creighton, Jolien D. E. and Van Den Broeck, Chris},
+  title = {Strong Gravitational-wave Lensing Posterior Odds},
+  journal = {Astrophys. J.},
+  archiveprefix = {arXiv},
+  eprint = {2510.15463},
+  primaryclass = {astro-ph.HE},
+  doi = {10.3847/1538-4357/ae5816},
+  year = {2026},
+  number = {1},
+  pages = {42},
+  reportnumber = {LIGO-P2500326-v3 LIGO-P2500326},
+  volume = {1002}
+}
+
+@article{Heynen2026LeveragingThe,
+  author = {Heynen, Jef and Roy, Soumen and Janquart, Justin},
+  title = {Leveraging the null stream to detect strongly lensed gravitational wave signals},
+  journal = {J. Phys. Conf. Ser.},
+  archiveprefix = {arXiv},
+  eprint = {2509.06745},
+  primaryclass = {gr-qc},
+  doi = {10.1088/1742-6596/3177/1/012080},
+  year = {2026},
+  number = {1},
+  pages = {012080},
+  volume = {3177}
+}
+
+@article{Hu2026GW231123Overlapping,
+  author = {Hu, Qian and Narola, Harsh and Heynen, Jef and Wright, Mick and Veitch, John and Janquart, Justin and Van Den Broeck, Chris},
+  title = {GW231123: Overlapping Gravitational Wave Signals?},
+  journal = {Astrophys. J.},
+  archiveprefix = {arXiv},
+  eprint = {2512.17550},
+  primaryclass = {gr-qc},
+  doi = {10.3847/1538-4357/ae6811},
+  year = {2026},
+  number = {2},
+  pages = {187},
+  reportnumber = {LIGO-P2500697},
+  volume = {1003}
+}
+
+@article{Li2026AFirst,
+  author = {Li, Alvin K. Y. and Hannuksela, Otto A.},
+  title = {A First Investigation of Repeated-Signal Localization of Strongly Lensed Gravitational Waves for Multimessenger Astronomy},
+  archiveprefix = {arXiv},
+  eprint = {2604.16561},
+  primaryclass = {astro-ph.IM},
+  year = {2026},
+  month = {4}
+}
+
+@article{Li2026InvestigatingThe,
+  author = {Li, Alvin K. Y. and Lai, Peony K. K. and Li, Elwin K. Y. and Hannuksela, Otto A.},
+  title = {Investigating the effect of sensitivity of KAGRA on sky localization of gravitational-wave sources from compact binary coalescences},
+  archiveprefix = {arXiv},
+  eprint = {2604.13580},
+  primaryclass = {gr-qc},
+  year = {2026},
+  month = {4}
+}
+
+@article{Negri2026ImpactOf,
+  author = {Negri, Luca and others},
+  title = {Impact of the Einstein Telescope's duty cycle on the estimation of binary black holes parameters},
+  archiveprefix = {arXiv},
+  eprint = {2606.19201},
+  primaryclass = {gr-qc},
+  year = {2026},
+  month = {6}
+}
+
+@article{Roy2026LineOfSightAcceleration,
+  author = {Roy, Soumen and Janquart, Justin},
+  title = {Line-of-sight acceleration in compact binaries with higher harmonics and eccentricity},
+  archiveprefix = {arXiv},
+  eprint = {2606.08838},
+  primaryclass = {gr-qc},
+  year = {2026},
+  month = {6},
+  reportnumber = {LIGO Document P2600263}
+}
+
+@article{Roy2026TestingModified,
+  author = {Roy, Soumen and Janquart, Justin},
+  title = {Testing modified gravity with the eccentric neutron star-black hole merger GW200105},
+  journal = {Phys. Rev. D},
+  archiveprefix = {arXiv},
+  eprint = {2507.21315},
+  primaryclass = {gr-qc},
+  doi = {10.1103/6scp-xqhb},
+  year = {2026},
+  number = {2},
+  pages = {024056},
+  reportnumber = {LIGO-P2500438},
+  volume = {113}
+}
+
+@article{Seo2026TheImpact,
+  author = {Seo, Eungwang and Kim, Kyungmin and Li, Zhuotao and Janquart, Justin and Gray, Rachel and Hendry, Martin},
+  title = {The Impact of Strong Lensing on Hubble Constant Measurements with Gravitational-wave Dark Sirens},
+  journal = {Astrophys. J. Suppl.},
+  archiveprefix = {arXiv},
+  eprint = {2603.01321},
+  primaryclass = {astro-ph.CO},
+  doi = {10.3847/1538-4365/ae579a},
+  year = {2026},
+  number = {1},
+  pages = {20},
+  reportnumber = {LIGO-P2600059},
+  volume = {284}
+}
+
+@article{Shan2026SpinPrecession,
+  author = {Shan, Xikai and Yang, Huan and Mao, Shude and Hannuksela, Otto A.},
+  title = {Spin Precession Signatures as an Indicator of Microlensing in Strongly Lensed Gravitational Waves},
+  journal = {Astrophys. J.},
+  archiveprefix = {arXiv},
+  eprint = {2508.21262},
+  primaryclass = {astro-ph.CO},
+  doi = {10.3847/1538-4357/ae6ce1},
+  year = {2026},
+  number = {1},
+  pages = {35},
+  volume = {1004}
+}
+
+@inproceedings{Uronen2026JointBayesian,
+  author = {Uronen, Laura and Li, Tian and Janquart, Justin and Phurailatpam, Hemanta and Poon, Jason and Collett, Thomas and Koopmans, Leon and Hannuksela, Otto},
+  title = {Joint Bayesian Source and Lens Reconstruction for Multi-messenger Binary Black Holes},
+  booktitle = {44th International Workshop on Bayesian Inference and Maximum Entropy Methods in Science and Engineerin},
+  archiveprefix = {arXiv},
+  eprint = {2603.09794},
+  primaryclass = {astro-ph.HE},
+  year = {2026},
+  month = {3}
+}
+
+@article{Wright2026LensingFlowAn,
+  author = {Wright, Mick and others},
+  title = {LensingFlow: an automated workflow for gravitational wave lensing analyses},
+  journal = {RAS Tech. Instrum.},
+  archiveprefix = {arXiv},
+  eprint = {2507.20256},
+  primaryclass = {gr-qc},
+  doi = {10.1093/rasti/rzag003},
+  year = {2026},
+  pages = {rzag003},
+  volume = {5}
+}
+
+@article{Wu2026WeakLensingApproximation,
+  author = {Wu, Zhao-Feng and Hannuksela, Otto A. and Hendry, Martin and Nguyen, Quynh Lan},
+  title = {Weak-lensing Approximation of Wave-optics Effects from General Symmetric Lens Profiles},
+  journal = {Astrophys. J.},
+  archiveprefix = {arXiv},
+  eprint = {2508.17486},
+  primaryclass = {gr-qc},
+  doi = {10.3847/1538-4357/ae1a6c},
+  year = {2026},
+  number = {1},
+  pages = {25},
+  volume = {996}
+}
+
+@article{Yang2026AMinuteCadence,
+  author = {Yang, Hongjing and others},
+  title = {A Minute-Cadence Deep Bulge Survey: First Data Release of DREAMS},
+  archiveprefix = {arXiv},
+  eprint = {2605.27364},
+  primaryclass = {astro-ph.SR},
+  year = {2026},
+  month = {5}
+}
+
+@article{Yang2026KMT2025BLG1616LbFirst,
+  author = {Yang, Hongjing and others},
+  title = {KMT-2025-BLG-1616Lb: First Microlensing Bound Planet From DREAMS},
+  journal = {Astron. J.},
+  archiveprefix = {arXiv},
+  eprint = {2601.11469},
+  primaryclass = {astro-ph.EP},
+  doi = {10.3847/1538-3881/ae36ac},
+  year = {2026},
+  collaboration = {Leading Authors, DREAMS, KMTNet, PRIME},
+  number = {3},
+  pages = {151},
+  volume = {171}
+}
+
+@article{ZumalacARregui2026EffectiveDescription,
+  author = {Zumalac{\'a}rregui, Miguel and Shan, Xikai},
+  title = {Effective description of lensed gravitational waves diffracted by stellar fields},
+  archiveprefix = {arXiv},
+  eprint = {2606.17765},
+  primaryclass = {astro-ph.HE},
+  year = {2026},
+  month = {6}
+}

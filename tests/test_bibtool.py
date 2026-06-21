@@ -47,6 +47,7 @@ class StubProvider:
         self.author_results = author_results if author_results is not None else list(self.query_results)
         self.title_results = title_results if title_results is not None else list(self.query_results)
         self.seen_queries: list[tuple[str, int | None]] = []
+        self.seen_name_title_queries: list[tuple[str, str, int | None]] = []
         self.fetch_calls: list[tuple[str, str]] = []
 
     def fetch_query_entries(self, query: str):
@@ -76,6 +77,27 @@ class StubProvider:
         self.seen_queries.append((query, limit))
         results = list(self.title_results)
         return results if limit is None else results[:limit]
+
+    def search_name_and_title(self, name: str, title: str, limit: int | None = 20):
+        from bibtool.inspire import _normalized_words, _text_contains_all_words
+
+        self.seen_name_title_queries.append((name, title, limit))
+        name_words = _normalized_words(name)
+        title_words = _normalized_words(title)
+        results = [
+            result
+            for result in self.author_results
+            if any(_text_contains_all_words(author, name_words) for author in result.authors)
+            and _text_contains_all_words(result.title, title_words)
+        ]
+        deduped: list[SearchResult] = []
+        seen: set[int] = set()
+        for result in results:
+            if result.recid in seen:
+                continue
+            seen.add(result.recid)
+            deduped.append(result)
+        return deduped if limit is None else deduped[:limit]
 
 
 class BibtoolCliTests(unittest.TestCase):
@@ -422,25 +444,17 @@ class BibtoolCliTests(unittest.TestCase):
             author_results=[
                 SearchResult(
                     recid=301,
-                    title="Author Match",
+                    title="GWTC-5 Author Match",
                     authors=["Hannuksela, Otto"],
                     year="2024",
                 ),
                 SearchResult(
                     recid=999,
-                    title="Wrong Author Only",
+                    title="Wrong Title",
                     authors=["Hannuksela, Otto"],
                     year="2022",
                 ),
             ],
-            title_results=[
-                SearchResult(
-                    recid=301,
-                    title="Author Match",
-                    authors=["Hannuksela, Otto"],
-                    year="2025",
-                ),
-            ]
         )
 
         stdout = io.StringIO()
@@ -452,10 +466,9 @@ class BibtoolCliTests(unittest.TestCase):
         )
 
         self.assertEqual(exit_code, 0)
-        self.assertIn(("Otto Hannuksela", 20), provider.seen_queries)
-        self.assertIn(("GWTC-5", 20), provider.seen_queries)
-        self.assertIn("Author Match", stdout.getvalue())
-        self.assertNotIn("Wrong Author Only", stdout.getvalue())
+        self.assertEqual(provider.seen_name_title_queries, [("Otto Hannuksela", "GWTC-5", 20)])
+        self.assertIn("GWTC-5 Author Match", stdout.getvalue())
+        self.assertNotIn("Wrong Title", stdout.getvalue())
 
     def test_search_dedupes_combined_name_and_title_results(self) -> None:
         shared = SearchResult(
@@ -466,7 +479,6 @@ class BibtoolCliTests(unittest.TestCase):
         )
         provider = StubProvider(
             author_results=[shared, shared],
-            title_results=[shared],
         )
 
         stdout = io.StringIO()
@@ -480,17 +492,22 @@ class BibtoolCliTests(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         self.assertEqual(stdout.getvalue().count("Shared Match"), 1)
 
-    def test_search_name_and_title_requires_title_match_in_title(self) -> None:
+    def test_search_name_and_title_matches_bayesian_substring(self) -> None:
         provider = StubProvider(
             author_results=[
+                SearchResult(
+                    recid=2738695,
+                    title="Bayesian power spectral estimation of gravitational wave detector noise",
+                    authors=["Gupta, Toral", "Cornish, Neil J."],
+                    year="2024",
+                ),
                 SearchResult(
                     recid=501,
                     title="A Paper Without Keyword",
                     authors=["Cornish, Neil"],
                     year="2024",
-                )
+                ),
             ],
-            title_results=[],
         )
 
         stdout = io.StringIO()
@@ -502,7 +519,8 @@ class BibtoolCliTests(unittest.TestCase):
         )
 
         self.assertEqual(exit_code, 0)
-        self.assertIn("No matching records found.", stdout.getvalue())
+        self.assertIn("Bayesian power spectral estimation", stdout.getvalue())
+        self.assertNotIn("A Paper Without Keyword", stdout.getvalue())
 
     def test_search_rejects_positional_query_mixed_with_name_or_title(self) -> None:
         stderr = io.StringIO()
@@ -581,7 +599,7 @@ class InspireClientTests(unittest.TestCase):
         self.assertEqual(len(results), 20)
         self.assertEqual(len(client.requested_urls), 1)
         self.assertIn("q=%28title%3A%22GWTC-5%22+or+author%3A%22GWTC-5%22%29", client.requested_urls[0])
-        self.assertIn("size=20", client.requested_urls[0])
+        self.assertIn("size=50", client.requested_urls[0])
         self.assertIn("fields=titles%2Cauthors%2Cabstracts%2Cimprints%2Cpreprint_date%2Cpublication_info", client.requested_urls[0])
 
     def test_requests_use_timeout(self) -> None:

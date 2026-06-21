@@ -141,12 +141,16 @@ def _run_search(argv: Sequence[str], *, stdout: TextIO, provider: InspireClient)
     else:
         if not args.name and not args.title:
             raise CliError("Search query cannot be empty.")
-        name_results = provider.search_author(" ".join(args.name), limit=args.limit) if args.name else []
-        title_results = provider.search_title(" ".join(args.title), limit=args.limit) if args.title else []
         if args.name and args.title:
-            results = _intersect_search_results(name_results, title_results)[: args.limit]
+            results = provider.search_name_and_title(
+                " ".join(args.name),
+                " ".join(args.title),
+                limit=args.limit,
+            )
+        elif args.name:
+            results = provider.search_author(" ".join(args.name), limit=args.limit)
         else:
-            results = _dedupe_search_results(name_results or title_results)[: args.limit]
+            results = provider.search_title(" ".join(args.title), limit=args.limit)
 
     if not results:
         stdout.write("No matching records found.\n")
@@ -159,22 +163,6 @@ def _run_search(argv: Sequence[str], *, stdout: TextIO, provider: InspireClient)
         linked_title = _terminal_link(result.title, url)
         stdout.write(f"[{result.recid}] {author} ({year}) {linked_title}\n")
     return 0
-
-
-def _dedupe_search_results(results: list) -> list:
-    seen: set[int] = set()
-    deduped: list = []
-    for result in results:
-        if result.recid in seen:
-            continue
-        seen.add(result.recid)
-        deduped.append(result)
-    return deduped
-
-
-def _intersect_search_results(left: list, right: list) -> list:
-    right_ids = {result.recid for result in right}
-    return _dedupe_search_results([result for result in left if result.recid in right_ids])
 
 
 def _terminal_link(text: str, url: str) -> str:

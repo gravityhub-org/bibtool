@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import io
+import json
 import os
 from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
@@ -155,12 +157,13 @@ class InspireBehaviorTests(unittest.TestCase):
         self.assertEqual([result.recid for result in results], [1])
 
     def test_search_continues_to_next_page_until_limit_matches(self) -> None:
+        filler = [
+            _search_hit(recid=index, title="Something Else", author="A", year="2025")
+            for index in range(1, 51)
+        ]
         client = FakeInspireClient(
             pages=[
-                _search_page(
-                    _search_hit(recid=1, title="Something Else", author="A", year="2025"),
-                    _search_hit(recid=2, title="Another Thing", author="B", year="2025"),
-                ),
+                _search_page(*filler),
                 _search_page(
                     _search_hit(recid=3, title="GWTC-5 Methods", author="A", year="2025"),
                     _search_hit(recid=4, title="GWTC-5 Results", author="B", year="2025"),
@@ -187,6 +190,72 @@ class InspireBehaviorTests(unittest.TestCase):
         results = client.search("GWTC-5 Hannuksela", limit=10)
 
         self.assertEqual([result.recid for result in results], [3])
+
+    def test_search_name_and_title_uses_single_author_query(self) -> None:
+        client = FakeInspireClient(
+            pages=[
+                _search_page(
+                    _search_hit(recid=2738695, title="Bayesian power spectral estimation", author="Cornish, Neil J.", year="2024"),
+                    _search_hit(recid=501, title="Unrelated paper", author="Cornish, Neil J.", year="2024"),
+                )
+            ]
+        )
+
+        results = client.search_name_and_title("Neil Cornish", "Bayes", limit=20)
+
+        self.assertEqual([result.recid for result in results], [2738695])
+        self.assertEqual(len(client.requested_urls), 1)
+        self.assertIn("author%3A%22Neil%22+and+author%3A%22Cornish%22", client.requested_urls[0])
+        self.assertIn("title%3ABayes%2A", client.requested_urls[0])
+
+    def test_search_name_and_title_pages_until_limit(self) -> None:
+        filler = [
+            _search_hit(recid=index, title=f"Paper {index}", author="Cornish, Neil J.", year="2024")
+            for index in range(1, 51)
+        ]
+        bayes_hits = [
+            _search_hit(recid=1000 + index, title=f"Bayesian study {index}", author="Cornish, Neil J.", year="2020")
+            for index in range(25)
+        ]
+        client = FakeInspireClient(
+            pages=[
+                _search_page(*filler),
+                _search_page(*bayes_hits),
+            ]
+        )
+
+        results = client.search_name_and_title("Neil Cornish", "Bayes", limit=20)
+
+        self.assertEqual(len(results), 20)
+        self.assertTrue(all("Bayesian" in result.title for result in results))
+        self.assertEqual(len(client.requested_urls), 2)
+
+    def test_request_json_is_cached(self) -> None:
+        from bibtool.inspire import _JSON_CACHE
+
+        _JSON_CACHE.clear()
+        payload = _search_page(
+            _search_hit(recid=1, title="Bayesian paper", author="Cornish, Neil J.", year="2024"),
+        )
+
+        class Response:
+            def __init__(self, body: str) -> None:
+                self._body = body
+
+            def __enter__(self):
+                return io.BytesIO(self._body.encode("utf-8"))
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+        client = InspireClient(base_url="https://example.test/api/literature", timeout=1.0)
+        with patch("bibtool.inspire.urlopen", return_value=Response(json.dumps(payload))) as mock_urlopen:
+            first = client.search_name_and_title("Neil Cornish", "Bayes", limit=1)
+            second = client.search_name_and_title("Neil Cornish", "Bayes", limit=1)
+
+        self.assertEqual([result.recid for result in first], [1])
+        self.assertEqual([result.recid for result in second], [1])
+        self.assertEqual(mock_urlopen.call_count, 1)
 
     def test_fetch_query_entries_fetches_bibtex_for_each_match(self) -> None:
         client = BibtexPagingFakeInspireClient(

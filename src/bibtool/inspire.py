@@ -14,6 +14,10 @@ class InspireError(RuntimeError):
     pass
 
 
+_JSON_CACHE: dict[str, Any] = {}
+_TEXT_CACHE: dict[str, str] = {}
+
+
 @dataclass(slots=True)
 class SearchResult:
     recid: int
@@ -73,6 +77,18 @@ class InspireClient:
             limit=limit,
         )
 
+    def search_name_and_title(self, name: str, title: str, limit: int | None = 20) -> list[SearchResult]:
+        name_words = _normalized_words(name)
+        title_words = _normalized_words(title)
+        return self._search_records(
+            self._name_title_query(name, title),
+            matcher=lambda result: (
+                any(_text_contains_all_words(author, name_words) for author in result.authors)
+                and _text_contains_all_words(result.title, title_words)
+            ),
+            limit=limit,
+        )
+
     def fetch_entry(self, recid: int) -> BibEntry:
         body = self._request_text(f"{self.base_url}/{recid}?format=bibtex")
         entries = parse_bibtex(body)
@@ -118,17 +134,17 @@ class InspireClient:
         limit: int | None,
     ) -> list[SearchResult]:
         results: list[SearchResult] = []
+        seen_recids: set[int] = set()
         page = 1
+        page_size = 50
         while page <= 10:
-            remaining = None if limit is None else limit - len(results)
-            if remaining is not None and remaining <= 0:
+            if limit is not None and len(results) >= limit:
                 break
-            size = 50 if remaining is None else max(1, min(50, remaining))
             params = urlencode(
                 {
                     "q": query,
                     "page": page,
-                    "size": size,
+                    "size": page_size,
                     "sort": "mostrecent",
                     "fields": "titles,authors,abstracts,imprints,preprint_date,publication_info",
                 }
@@ -138,11 +154,14 @@ class InspireClient:
             if not hits:
                 break
             for result in _search_results_from_hits(hits):
+                if result.recid in seen_recids:
+                    continue
                 if matcher(result):
+                    seen_recids.add(result.recid)
                     results.append(result)
                     if limit is not None and len(results) >= limit:
                         return results
-            if len(hits) < size:
+            if len(hits) < page_size:
                 break
             page += 1
         return results
@@ -172,19 +191,36 @@ class InspireClient:
             raise InspireError("Search query cannot be empty.")
         return " and ".join(f'title:"{_escape_query_token(token)}"' for token in tokens)
 
+    def _name_title_query(self, name: str, title: str) -> str:
+        title_tokens = _query_tokens(title)
+        if not title_tokens:
+            raise InspireError("Search query cannot be empty.")
+        title_part = " and ".join(f"title:{_escape_query_token(token)}*" for token in title_tokens)
+        return f"{self._author_query(name)} and {title_part}"
+
     def _request_json(self, url: str) -> dict[str, Any]:
+        cached = _JSON_CACHE.get(url)
+        if cached is not None:
+            return cached
         try:
             with urlopen(url, timeout=self.timeout) as response:
-                return json.load(response)
+                payload = json.load(response)
         except (HTTPError, URLError, json.JSONDecodeError) as error:
             raise InspireError(f"Unable to query INSPIRE: {error}") from error
+        _JSON_CACHE[url] = payload
+        return payload
 
     def _request_text(self, url: str) -> str:
+        cached = _TEXT_CACHE.get(url)
+        if cached is not None:
+            return cached
         try:
             with urlopen(url, timeout=self.timeout) as response:
-                return response.read().decode("utf-8")
+                body = response.read().decode("utf-8")
         except (HTTPError, URLError, UnicodeDecodeError) as error:
             raise InspireError(f"Unable to fetch BibTeX from INSPIRE: {error}") from error
+        _TEXT_CACHE[url] = body
+        return body
 
 
 def _search_results_from_hits(hits: list[dict[str, Any]]) -> list[SearchResult]:
