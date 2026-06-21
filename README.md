@@ -12,8 +12,8 @@ uv tool install --upgrade git+https://github.com/gravityhub-org/bibtool.git && b
 
 ```bash
 bibtool references.bib
-bibtool update
-bibtool update references.bib
+bibtool update paper/references.bib
+bibtool --bib paper/references.bib --title "GW231123" --y
 bibtool --y --name Otto Hannuksela
 bibtool --query Otto Hannuksela
 bibtool --name Otto Hannuksela
@@ -27,6 +27,7 @@ bibtool --install-completion
 ## Behavior
 
 - `bibtool references.bib` merges `$LATEX_TEMPLATE_DIR/references.bib` into the target file.
+- Any target bibliography can be used: collaborator-added entries keep their BibTeX keys, matching papers are updated in place, and only genuinely new papers are appended.
 - `--query`, `--name`, and `--title` import into `$LATEX_TEMPLATE_DIR/references.bib` by default, or another file via `--bib`.
 - `--name` and `--title` can be combined in one import command; their results are merged and de-duplicated before writing.
 - `search` takes plain search terms and queries INSPIRE HEP without modifying files.
