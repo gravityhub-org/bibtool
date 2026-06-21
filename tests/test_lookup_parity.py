@@ -67,7 +67,7 @@ class LookupParityTests(unittest.TestCase):
 
         self.assertEqual([result.recid for result in search_results], [3, 4])
         self.assertEqual([entry.key for entry in fetch_entries], ["Fetched3", "Fetched4"])
-        self.assertEqual(client.json_requests, 1)
+        self.assertEqual(client.json_requests, 3)
         self.assertEqual(client.text_requests, 2)
 
     def test_name_and_title_lookup_matches_bayesian_title_for_both_modes(self) -> None:

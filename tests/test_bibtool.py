@@ -682,7 +682,7 @@ class InspireClientTests(unittest.TestCase):
         self.assertEqual(len(client.requested_urls), 1)
         self.assertIn("q=%28title%3A%22GWTC-5%22+or+author%3A%22GWTC-5%22%29", client.requested_urls[0])
         self.assertIn("size=50", client.requested_urls[0])
-        self.assertIn("fields=titles%2Cauthors%2Cabstracts%2Cimprints%2Cpreprint_date%2Cpublication_info", client.requested_urls[0])
+        self.assertIn("publication_info", client.requested_urls[0])
 
     def test_requests_use_timeout(self) -> None:
         client = InspireClient(timeout=7.0)

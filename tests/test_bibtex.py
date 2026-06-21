@@ -6,7 +6,16 @@ import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from bibtool.bibtex import BibEntry, assign_generated_key, normalize_for_match, normalize_inspire_entry, parse_bibtex, write_bibtex
+from bibtool.bibtex import (
+    BibEntry,
+    assign_generated_key,
+    enrich_entry_from_metadata,
+    merge_entry_fields,
+    normalize_for_match,
+    normalize_inspire_entry,
+    parse_bibtex,
+    write_bibtex,
+)
 
 
 class BibtexTests(unittest.TestCase):
@@ -98,6 +107,66 @@ class BibtexTests(unittest.TestCase):
         )
 
         self.assertEqual(entry.fields["journal"], "Phys. Rev. D")
+
+    def test_enrich_entry_from_metadata_adds_publication_fields(self) -> None:
+        entry = enrich_entry_from_metadata(
+            BibEntry(
+                entry_type="article",
+                key="Preprint",
+                fields={
+                    "author": "Littenberg, Tyson B. and Cornish, Neil J.",
+                    "title": "Bayesian inference",
+                    "eprint": "1410.3852",
+                    "archiveprefix": "arXiv",
+                    "journal": "arXiv",
+                    "year": "2014",
+                },
+            ),
+            {
+                "publication_info": [
+                    {
+                        "journal_title": "Phys.Rev.D",
+                        "journal_volume": "91",
+                        "journal_issue": "8",
+                        "artid": "084034",
+                        "year": 2015,
+                    }
+                ],
+                "dois": [{"value": "10.1103/PhysRevD.91.084034"}],
+            },
+        )
+
+        self.assertEqual(entry.fields["journal"], "Phys. Rev. D")
+        self.assertEqual(entry.fields["volume"], "91")
+        self.assertEqual(entry.fields["number"], "8")
+        self.assertEqual(entry.fields["pages"], "084034")
+        self.assertEqual(entry.fields["year"], "2015")
+        self.assertEqual(entry.fields["doi"], "10.1103/PhysRevD.91.084034")
+
+    def test_merge_entry_fields_keeps_published_journal_over_incoming_arxiv(self) -> None:
+        merged = merge_entry_fields(
+            BibEntry(
+                entry_type="article",
+                key="Key",
+                fields={
+                    "journal": "Phys. Rev. D",
+                    "volume": "91",
+                    "year": "2015",
+                },
+            ),
+            BibEntry(
+                entry_type="article",
+                key="Remote",
+                fields={
+                    "journal": "arXiv",
+                    "eprint": "1410.3852",
+                    "year": "2014",
+                },
+            ),
+        )
+
+        self.assertEqual(merged.fields["journal"], "Phys. Rev. D")
+        self.assertEqual(merged.fields["eprint"], "1410.3852")
 
 
 if __name__ == "__main__":

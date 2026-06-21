@@ -8,7 +8,17 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import urlopen
 
-from .bibtex import BibEntry, first_author_name, merge_entry_fields, normalize_inspire_entry, parse_bibtex, normalize_for_match, strip_outer_wrappers
+from .bibtex import (
+    BibEntry,
+    best_publication_info,
+    enrich_entry_from_metadata,
+    first_author_name,
+    merge_entry_fields,
+    normalize_inspire_entry,
+    parse_bibtex,
+    normalize_for_match,
+    strip_outer_wrappers,
+)
 
 
 class InspireError(RuntimeError):
@@ -31,6 +41,7 @@ class SearchResult:
     authors: list[str]
     year: str
     abstract: str = ""
+    has_journal_publication: bool = False
 
     @property
     def first_author(self) -> str:
@@ -136,32 +147,43 @@ class InspireClient:
         entries = parse_bibtex(body)
         if not entries:
             raise InspireError(f"INSPIRE returned no BibTeX for record {recid}.")
-        return normalize_inspire_entry(entries[0])
+        metadata = self._fetch_metadata(recid)
+        entry = enrich_entry_from_metadata(entries[0], metadata)
+        return normalize_inspire_entry(entry)
+
+    def _fetch_metadata(self, recid: int) -> dict[str, Any]:
+        payload = self._request_json(f"{self.base_url}/{recid}?format=json")
+        metadata = payload.get("metadata")
+        return metadata if isinstance(metadata, dict) else {}
 
     def lookup_recid(self, entry: BibEntry) -> int | None:
         eprint = strip_outer_wrappers(entry.fields.get("eprint", ""))
         if eprint:
-            results = self._search_records(f"eprint:{eprint}", matcher=lambda _result: True, limit=1)
-            if results:
-                return results[0].recid
+            recid = self._lookup_recid_from_query(f"eprint:{eprint}")
+            if recid is not None:
+                return recid
 
         doi = _normalize_doi(entry.fields.get("doi", ""))
         if doi:
-            results = self._search_records(f"doi:{doi}", matcher=lambda _result: True, limit=1)
-            if results:
-                return results[0].recid
+            recid = self._lookup_recid_from_query(f"doi:{doi}")
+            if recid is not None:
+                return recid
 
         author = first_author_name(entry.author)
         title = strip_outer_wrappers(entry.title)
         if author and title:
-            results = self.search_name_and_title(author, _title_lookup_terms(title), limit=1)
-            if results:
-                return results[0].recid
+            spec = self.resolve_lookup(name=author, title=_title_lookup_terms(title))
+            results = self._search_records(spec.query, matcher=spec.result_matcher, limit=20)
+            return _pick_preferred_recid(results)
         if title:
-            results = self.search_title(_title_lookup_terms(title), limit=1)
-            if results:
-                return results[0].recid
+            spec = self.resolve_lookup(title=_title_lookup_terms(title))
+            results = self._search_records(spec.query, matcher=spec.result_matcher, limit=20)
+            return _pick_preferred_recid(results)
         return None
+
+    def _lookup_recid_from_query(self, query: str) -> int | None:
+        results = self._search_records(query, matcher=lambda _result: True, limit=20)
+        return _pick_preferred_recid(results)
 
     def refresh_entry(self, entry: BibEntry) -> BibEntry | None:
         recid = self.lookup_recid(entry)
@@ -193,7 +215,7 @@ class InspireClient:
                     "page": page,
                     "size": page_size,
                     "sort": "mostrecent",
-                    "fields": "titles,authors,abstracts,imprints,preprint_date,publication_info",
+                    "fields": "titles,authors,abstracts,imprints,preprint_date,publication_info,dois,arxiv_eprints",
                 }
             )
             payload = self._request_json(f"{self.base_url}/?{params}")
@@ -297,7 +319,16 @@ def _search_results_from_hits(hits: list[dict[str, Any]]) -> list[SearchResult]:
         recid = hit.get("id") or hit.get("metadata", {}).get("control_number")
         if not recid or not title:
             continue
-        results.append(SearchResult(recid=int(recid), title=title, authors=authors, year=year, abstract=abstract))
+        results.append(
+            SearchResult(
+                recid=int(recid),
+                title=title,
+                authors=authors,
+                year=year,
+                abstract=abstract,
+                has_journal_publication=best_publication_info(metadata) is not None,
+            )
+        )
     return results
 
 
@@ -382,6 +413,15 @@ def _entry_contains_all_words(
         fields.append(entry.author)
     haystack = normalize_for_match(" ".join(fields))
     return all(word in haystack for word in required_words)
+
+
+def _pick_preferred_recid(results: list[SearchResult]) -> int | None:
+    if not results:
+        return None
+    for result in results:
+        if result.has_journal_publication:
+            return result.recid
+    return results[0].recid
 
 
 def _escape_query_token(token: str) -> str:

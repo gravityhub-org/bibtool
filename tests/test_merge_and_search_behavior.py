@@ -294,9 +294,9 @@ class InspireBehaviorTests(unittest.TestCase):
         entries = client.fetch_query_entries("GWTC-5")
 
         self.assertEqual([entry.key for entry in entries], ["Fetched3", "Fetched4"])
-        self.assertEqual(client.json_requests, 1)
+        self.assertEqual(client.json_requests, 3)
         self.assertEqual(client.text_requests, 2)
-        self.assertIn("format=bibtex", client.requested_urls[-1])
+        self.assertTrue(any("format=bibtex" in url for url in client.requested_urls))
 
     def test_fetch_author_entries_uses_author_only_query(self) -> None:
         client = RecordingLookupClient(

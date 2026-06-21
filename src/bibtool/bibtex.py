@@ -96,16 +96,87 @@ def normalize_inspire_entry(entry: BibEntry) -> BibEntry:
     eprint = strip_outer_wrappers(normalized.fields.get("eprint", ""))
     journal = strip_outer_wrappers(normalized.fields.get("journal", ""))
     archiveprefix = strip_outer_wrappers(normalized.fields.get("archiveprefix", "")).lower()
-    if eprint and not journal and (not archiveprefix or archiveprefix == "arxiv"):
-        normalized.fields["journal"] = "arXiv"
+    if eprint and (not journal or is_arxiv_journal(journal)) and (not archiveprefix or archiveprefix == "arxiv"):
+        if not journal or is_arxiv_journal(journal):
+            normalized.fields["journal"] = "arXiv"
     return normalized
+
+
+def is_arxiv_journal(value: str) -> bool:
+    normalized = normalize_for_match(strip_outer_wrappers(value))
+    return normalized in {"arxiv", "ar xiv"}
+
+
+def format_inspire_journal_title(value: str) -> str:
+    title = strip_outer_wrappers(value)
+    if not title:
+        return title
+    if re.search(r"\.\s", title):
+        return title
+    return re.sub(r"\.(?=[A-Za-z])", ". ", title)
+
+
+def best_publication_info(metadata: dict) -> dict | None:
+    candidates = metadata.get("publication_info") or []
+    journals = [item for item in candidates if item.get("journal_title")]
+    if not journals:
+        return None
+    return max(journals, key=lambda item: item.get("year") or 0)
+
+
+def enrich_entry_from_metadata(entry: BibEntry, metadata: dict) -> BibEntry:
+    if not metadata:
+        return entry
+
+    enriched = entry.clone()
+    publication = best_publication_info(metadata)
+    if publication:
+        journal = publication.get("journal_title", "")
+        current_journal = strip_outer_wrappers(enriched.fields.get("journal", ""))
+        if journal and (not current_journal or is_arxiv_journal(current_journal)):
+            enriched.fields["journal"] = format_inspire_journal_title(str(journal))
+
+        for source, target in (
+            ("journal_volume", "volume"),
+            ("journal_issue", "number"),
+        ):
+            value = publication.get(source)
+            if value and not strip_outer_wrappers(enriched.fields.get(target, "")):
+                enriched.fields[target] = str(value)
+
+        pages = _pages_from_publication_info(publication)
+        if pages and not strip_outer_wrappers(enriched.fields.get("pages", "")):
+            enriched.fields["pages"] = pages
+
+        pub_year = publication.get("year")
+        if pub_year:
+            enriched.fields["year"] = str(pub_year)
+
+    dois = metadata.get("dois") or []
+    if dois and not strip_outer_wrappers(enriched.fields.get("doi", "")):
+        first = dois[0]
+        doi = first.get("value", "") if isinstance(first, dict) else str(first)
+        if doi:
+            enriched.fields["doi"] = doi
+
+    return enriched
 
 
 def merge_entry_fields(existing: BibEntry, incoming: BibEntry) -> BibEntry:
     merged = existing.clone()
     for name, value in incoming.fields.items():
-        if strip_outer_wrappers(value):
-            merged.fields[name] = value
+        if not strip_outer_wrappers(value):
+            continue
+        if name == "journal" and is_arxiv_journal(value):
+            current = strip_outer_wrappers(merged.fields.get("journal", ""))
+            if current and not is_arxiv_journal(current):
+                continue
+        merged.fields[name] = value
+
+    incoming_journal = strip_outer_wrappers(incoming.fields.get("journal", ""))
+    if incoming_journal and not is_arxiv_journal(incoming_journal):
+        merged.fields["journal"] = incoming_journal
+
     return merged
 
 
@@ -297,6 +368,19 @@ def _wrapping_pair(value: str, opener: str, closer: str) -> bool:
             if depth == 0 and index != len(value) - 1:
                 return False
     return depth == 0
+
+
+def _pages_from_publication_info(publication: dict) -> str:
+    artid = publication.get("artid")
+    if artid:
+        return str(artid)
+    start = publication.get("page_start")
+    end = publication.get("page_end")
+    if start and end:
+        return f"{start}-{end}"
+    if start:
+        return str(start)
+    return ""
 
 
 def first_author_name(author_field: str) -> str:

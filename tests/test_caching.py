@@ -53,10 +53,8 @@ class CachingTests(unittest.TestCase):
 
         self.assertEqual([entry.key for entry in first], ["Fetched3"])
         self.assertEqual([entry.key for entry in second], ["Fetched3"])
-        self.assertEqual(handler.json_calls, 1)
+        self.assertEqual(handler.json_calls, 2)
         self.assertEqual(handler.text_calls, 1)
-
-    def test_cache_is_shared_across_client_instances(self) -> None:
         payload = _search_page(
             _search_hit(recid=1, title="Bayesian paper", author="Cornish, Neil J.", year="2024"),
         )
@@ -87,7 +85,7 @@ class CachingTests(unittest.TestCase):
             client.lookup(query="GWTC-5", limit=1, as_entries=False)
             client.lookup(query="GWTC-5", limit=1, as_entries=True)
 
-        self.assertEqual(handler.json_calls, 1)
+        self.assertEqual(handler.json_calls, 2)
         self.assertEqual(handler.text_calls, 1)
 
     def test_clear_response_caches_forces_fresh_network_calls(self) -> None:
@@ -164,7 +162,7 @@ class CachingTests(unittest.TestCase):
         with patch("bibtool.inspire.urlopen", side_effect=handler):
             client.lookup(query="GWTC-5", limit=1, as_entries=True)
 
-        self.assertEqual(len(inspire_module._JSON_CACHE), 1)
+        self.assertEqual(len(inspire_module._JSON_CACHE), 2)
         self.assertEqual(len(inspire_module._TEXT_CACHE), 1)
 
 

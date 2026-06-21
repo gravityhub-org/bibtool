@@ -102,6 +102,59 @@ class UpdateCommandTests(unittest.TestCase):
             self.assertIn("Updated 1 entries", stdout.getvalue())
             self.assertIn("Skipped 1 entries", stdout.getvalue())
 
+    def test_update_upgrades_arxiv_preprint_to_published_journal(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "references.bib"
+            target.write_text(
+                """@article{Littenberg2015BayesianInference,
+  author = {Littenberg, Tyson B. and Cornish, Neil J.},
+  title = {Bayesian inference for spectral estimation of gravitational wave detector noise},
+  eprint = {1410.3852},
+  archiveprefix = {arXiv},
+  primaryclass = {gr-qc},
+  journal = {arXiv},
+  year = {2014}
+}
+""",
+                encoding="utf-8",
+            )
+
+            provider = UpdateProvider(
+                fresh_by_eprint={
+                    "1410.3852": BibEntry(
+                        entry_type="article",
+                        key="ignored",
+                        fields={
+                            "author": "Littenberg, Tyson B. and Cornish, Neil J.",
+                            "title": "Bayesian inference for spectral estimation of gravitational wave detector noise",
+                            "eprint": "1410.3852",
+                            "archiveprefix": "arXiv",
+                            "primaryclass": "gr-qc",
+                            "doi": "10.1103/PhysRevD.91.084034",
+                            "journal": "Phys. Rev. D",
+                            "volume": "91",
+                            "number": "8",
+                            "pages": "084034",
+                            "year": "2015",
+                        },
+                    ),
+                }
+            )
+
+            exit_code = run(
+                ["update", str(target), "--y"],
+                stdin=io.StringIO(),
+                stdout=io.StringIO(),
+                stderr=io.StringIO(),
+                provider=provider,
+            )
+
+            self.assertEqual(exit_code, 0)
+            content = target.read_text(encoding="utf-8")
+            self.assertIn("journal = {Phys. Rev. D}", content)
+            self.assertIn("doi = {10.1103/PhysRevD.91.084034}", content)
+            self.assertIn("pages = {084034}", content)
+
     def test_update_defaults_to_template_references_bib(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             template_dir = Path(tmp) / "template"
@@ -171,12 +224,76 @@ class LookupRecidTests(unittest.TestCase):
         self.assertEqual(client.lookup_recid(entry), 301)
         self.assertEqual(client.search_queries, ["eprint:2510.07228"])
 
+    def test_lookup_recid_prefers_published_record(self) -> None:
+        client = RecordingUpdateClient(
+            search_results={
+                "eprint:1410.3852": [100, 200],
+            },
+            search_metadata={
+                100: False,
+                200: True,
+            },
+            bibtex_by_recid={},
+        )
+        entry = BibEntry(
+            entry_type="article",
+            key="Key",
+            fields={"eprint": "1410.3852", "title": "Bayesian inference", "author": "Littenberg, Tyson B."},
+        )
+
+        self.assertEqual(client.lookup_recid(entry), 200)
+
+
+    def test_fetch_entry_enriches_publication_from_metadata(self) -> None:
+        client = RecordingUpdateClient(
+            search_results={},
+            bibtex_by_recid={
+                1322348: """@article{Littenberg:2014oda,
+  author = {Littenberg, Tyson B. and Cornish, Neil J.},
+  title = {Bayesian inference for spectral estimation of gravitational wave detector noise},
+  eprint = {1410.3852},
+  archivePrefix = {arXiv},
+  year = {2014}
+}
+""",
+            },
+            metadata_by_recid={
+                1322348: {
+                    "publication_info": [
+                        {
+                            "journal_title": "Phys.Rev.D",
+                            "journal_volume": "91",
+                            "journal_issue": "8",
+                            "artid": "084034",
+                            "year": 2015,
+                        }
+                    ],
+                    "dois": [{"value": "10.1103/PhysRevD.91.084034"}],
+                }
+            },
+        )
+
+        entry = client.fetch_entry(1322348)
+
+        self.assertEqual(entry.fields["journal"], "Phys. Rev. D")
+        self.assertEqual(entry.fields["doi"], "10.1103/PhysRevD.91.084034")
+        self.assertEqual(entry.fields["pages"], "084034")
+
 
 class RecordingUpdateClient(InspireClient):
-    def __init__(self, *, search_results: dict[str, list[int]], bibtex_by_recid: dict[int, str]) -> None:
+    def __init__(
+        self,
+        *,
+        search_results: dict[str, list[int]],
+        bibtex_by_recid: dict[int, str],
+        search_metadata: dict[int, bool] | None = None,
+        metadata_by_recid: dict[int, dict] | None = None,
+    ) -> None:
         super().__init__(base_url="https://example.test/api/literature", timeout=1.0)
         self.search_results = search_results
         self.bibtex_by_recid = bibtex_by_recid
+        self.search_metadata = search_metadata or {}
+        self.metadata_by_recid = metadata_by_recid or {}
         self.requested_urls: list[str] = []
         self.search_queries: list[str] = []
 
@@ -186,9 +303,18 @@ class RecordingUpdateClient(InspireClient):
         self.search_queries.append(query)
         recids = self.search_results.get(query, [])[: limit or None]
         return [
-            SearchResult(recid=recid, title="Title", authors=["Author"], year="2025")
+            SearchResult(
+                recid=recid,
+                title="Title",
+                authors=["Author"],
+                year="2025",
+                has_journal_publication=self.search_metadata.get(recid, False),
+            )
             for recid in recids
         ]
+
+    def _fetch_metadata(self, recid: int) -> dict:
+        return self.metadata_by_recid.get(recid, {})
 
     def _request_text(self, url: str) -> str:
         self.requested_urls.append(url)
