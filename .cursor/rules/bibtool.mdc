@@ -1,0 +1,48 @@
+---
+description: Core conventions for the bibtool CLI repository
+alwaysApply: true
+---
+
+# bibtool
+
+Python 3.13+ CLI under `src/bibtool/`. Stdlib only — no third-party runtime deps.
+
+## Modules
+
+- `cli.py` — argparse, I/O, confirmation prompts
+- `inspire.py` — INSPIRE HEP HTTP client, search/lookup, caches
+- `bibtex.py` — parse/write/merge/dedupe BibTeX
+
+Inject `InspireClient` (or stubs) via `run(..., provider=...)` in tests. Prefer `unittest`.
+
+## Data source
+
+Literature metadata comes from **INSPIRE HEP only** (`inspirehep.net/api/literature`).
+
+- Do **not** call the arXiv API (rate limits / stalls).
+- arXiv IDs, DOIs, journal data: take from INSPIRE JSON fields (`arxiv_eprints`, `dois`, `publication_info`, etc.) already returned with search/fetch.
+- Prefer published INSPIRE records over preprint-only when choosing a match.
+
+## Bibliography behavior
+
+- Deduplicate case-insensitively by **title / DOI / eprint**, not BibTeX key.
+- On match: update fields in place; **preserve existing keys**.
+- New keys: `FirstAuthorYearFirstTwoTitleWords`.
+- arXiv-only `@article`: set `journal = {arXiv}` for REVTeX/APS.
+- Sort output by year, then first author, then title.
+- `search`/`import` share `resolve_lookup` — keep search and fetch query/matcher parity.
+- Search: loose INSPIRE keyword query, then local case-insensitive AND filter on metadata.
+
+## CLI
+
+- Default import/update target: `$LATEX_TEMPLATE_DIR/references.bib` (override with path/`--bib`).
+- Large imports (>10 entries): require double confirm unless `--y`.
+- `update` never prompts; may parallelize with `--workers`.
+
+## Tests
+
+```bash
+python -m unittest discover -s tests
+```
+
+Clear INSPIRE response caches between tests that hit HTTP helpers (`clear_response_caches`).
