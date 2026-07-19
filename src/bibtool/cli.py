@@ -18,7 +18,7 @@ from .bibtex import (
     sort_key,
     write_bibtex,
 )
-from .inspire import InspireClient, InspireError
+from .inspire import InspireClient, InspireError, SearchResult, parse_literature_id
 
 
 class CliError(RuntimeError):
@@ -49,6 +49,8 @@ def run(
             return completion_result
         if argv and argv[0] == "search":
             return _run_search(argv[1:], stdout=stdout, provider=provider)
+        if argv and argv[0] == "download":
+            return _run_download(argv[1:], stdin=stdin, stdout=stdout, provider=provider)
         if argv and argv[0] == "update":
             return _run_update(argv[1:], stdin=stdin, stdout=stdout, provider=provider)
         return _run_default(argv, stdin=stdin, stdout=stdout, provider=provider)
@@ -221,27 +223,13 @@ def _refresh_entries(
 
 
 def _run_search(argv: Sequence[str], *, stdout: TextIO, provider: InspireClient) -> int:
-    parser = argparse.ArgumentParser(prog="bibtool search")
-    parser.add_argument("query", nargs="*")
-    parser.add_argument("--name", nargs="+")
-    parser.add_argument("--title", nargs="+")
-    parser.add_argument("--limit", type=int, default=20)
-    args = parser.parse_args(list(argv))
-
-    if args.query and (args.name or args.title):
-        raise CliError("Use either positional search terms or --name/--title, not both.")
-
-    query = " ".join(args.query) if args.query else None
-    name = " ".join(args.name) if args.name else None
-    title = " ".join(args.title) if args.title else None
-    if not query and not name and not title:
-        raise CliError("Search query cannot be empty.")
+    query, name, title, limit = _parse_lookup_command_args(argv, prog="bibtool search")
 
     results = provider.lookup(
         query=query,
         name=name,
         title=title,
-        limit=args.limit,
+        limit=limit,
         as_entries=False,
     )
 
@@ -257,6 +245,219 @@ def _run_search(argv: Sequence[str], *, stdout: TextIO, provider: InspireClient)
         arxiv = f" arXiv:{result.arxiv_id}" if result.arxiv_id else ""
         stdout.write(f"[{result.recid}] {author} ({year}) {linked_title}{arxiv}\n")
     return 0
+
+
+def _run_download(
+    argv: Sequence[str],
+    *,
+    stdin: TextIO,
+    stdout: TextIO,
+    provider: InspireClient,
+) -> int:
+    parser = argparse.ArgumentParser(prog="bibtool download")
+    parser.add_argument("query", nargs="*")
+    parser.add_argument("--name", nargs="+")
+    parser.add_argument("--title", nargs="+")
+    parser.add_argument("--arxiv", nargs="+", dest="arxiv_ids")
+    parser.add_argument("--inspire", nargs="+", dest="inspire_ids")
+    parser.add_argument("--limit", type=int, default=20)
+    parser.add_argument("--dir", dest="directory", default=".")
+    parser.add_argument("--y", action="store_true", dest="yes")
+    args = parser.parse_args(list(argv))
+
+    results = _resolve_download_results(args, provider=provider)
+
+    if not results:
+        stdout.write("No matching records found.\n")
+        return 0
+
+    downloadable = [result for result in results if result.arxiv_id]
+    skipped_no_arxiv = [result for result in results if not result.arxiv_id]
+
+    if not downloadable:
+        stdout.write("No matching records with an arXiv eprint to download.\n")
+        return 0
+
+    destination = Path(args.directory)
+    destination.mkdir(parents=True, exist_ok=True)
+
+    to_fetch = [result for result in downloadable if not (destination / _pdf_filename(result.arxiv_id)).exists()]
+    already_present = len(downloadable) - len(to_fetch)
+
+    if not to_fetch:
+        stdout.write(f"All {len(downloadable)} matching PDFs already exist in {destination}.\n")
+        if skipped_no_arxiv:
+            stdout.write(f"Skipped {len(skipped_no_arxiv)} records without an arXiv eprint.\n")
+        return 0
+
+    _double_confirm_large_additions(
+        len(to_fetch),
+        stdin=stdin,
+        stdout=stdout,
+        auto_confirm=args.yes,
+        action="download",
+    )
+
+    downloaded = 0
+    failed: list[str] = []
+    fetch_pdf = getattr(provider, "fetch_pdf", None)
+    if not callable(fetch_pdf):
+        raise CliError("Provider does not support PDF downloads.")
+
+    for result in to_fetch:
+        path = destination / _pdf_filename(result.arxiv_id)
+        try:
+            path.write_bytes(fetch_pdf(result.arxiv_id))
+        except InspireError as error:
+            failed.append(f"{result.arxiv_id} ({error})")
+            continue
+        downloaded += 1
+        stdout.write(f"Downloaded {path}\n")
+
+    if downloaded:
+        stdout.write(f"Downloaded {downloaded} PDFs to {destination}.\n")
+    if already_present:
+        stdout.write(f"Skipped {already_present} existing PDFs.\n")
+    if skipped_no_arxiv:
+        stdout.write(f"Skipped {len(skipped_no_arxiv)} records without an arXiv eprint.\n")
+    if failed:
+        stdout.write(f"Failed to download {len(failed)} PDFs.\n")
+        for item in failed:
+            stdout.write(f"  {item}\n")
+        return 1
+    return 0
+
+
+def _resolve_download_results(args: argparse.Namespace, *, provider: InspireClient) -> list[SearchResult]:
+    has_flags = bool(args.arxiv_ids or args.inspire_ids)
+    has_name_title = bool(args.name or args.title)
+    query_tokens = list(args.query or [])
+
+    if has_flags and (query_tokens or has_name_title):
+        raise CliError("Use --arxiv/--inspire by themselves, or a search query / --name/--title.")
+    if has_flags:
+        return _results_from_explicit_ids(
+            arxiv_ids=args.arxiv_ids or [],
+            inspire_ids=args.inspire_ids or [],
+            provider=provider,
+        )
+
+    query, name, title = _normalize_lookup_terms(args)
+    if not query and not name and not title:
+        raise CliError("Download query cannot be empty.")
+
+    if query is not None and name is None and title is None:
+        id_results = _maybe_results_from_query_ids(query_tokens, provider=provider)
+        if id_results is not None:
+            return id_results
+
+    return list(
+        provider.lookup(
+            query=query,
+            name=name,
+            title=title,
+            limit=args.limit,
+            as_entries=False,
+        )
+    )
+
+
+def _maybe_results_from_query_ids(
+    tokens: Sequence[str],
+    *,
+    provider: InspireClient,
+) -> list[SearchResult] | None:
+    parsed_items: list[tuple[str, str]] = []
+    saw_id = False
+    saw_non_id = False
+    for token in tokens:
+        parsed = parse_literature_id(token)
+        if parsed is None:
+            saw_non_id = True
+            continue
+        saw_id = True
+        parsed_items.append(parsed)
+
+    if saw_id and saw_non_id:
+        raise CliError("Mix of literature ids and search terms is not supported; use one or the other.")
+    if not saw_id:
+        return None
+
+    arxiv_ids = [value for kind, value in parsed_items if kind == "arxiv"]
+    inspire_ids = [value for kind, value in parsed_items if kind == "inspire"]
+    return _results_from_explicit_ids(arxiv_ids=arxiv_ids, inspire_ids=inspire_ids, provider=provider)
+
+
+def _results_from_explicit_ids(
+    *,
+    arxiv_ids: Sequence[str],
+    inspire_ids: Sequence[str],
+    provider: InspireClient,
+) -> list[SearchResult]:
+    results: list[SearchResult] = []
+    seen_keys: set[str] = set()
+
+    fetch_by_arxiv = getattr(provider, "fetch_result_by_arxiv", None)
+    fetch_by_recid = getattr(provider, "fetch_result_by_recid", None)
+
+    for raw in arxiv_ids:
+        if not callable(fetch_by_arxiv):
+            raise CliError("Provider does not support arXiv id lookup.")
+        result = fetch_by_arxiv(raw)
+        key = result.arxiv_id or f"arxiv:{raw}"
+        if key in seen_keys:
+            continue
+        seen_keys.add(key)
+        results.append(result)
+
+    for raw in inspire_ids:
+        if not callable(fetch_by_recid):
+            raise CliError("Provider does not support INSPIRE id lookup.")
+        try:
+            recid = int(str(raw).strip())
+        except ValueError as error:
+            raise CliError(f"Invalid INSPIRE id: {raw}") from error
+        result = fetch_by_recid(recid)
+        key = result.arxiv_id or f"inspire:{result.recid}"
+        if key in seen_keys:
+            continue
+        seen_keys.add(key)
+        results.append(result)
+
+    return results
+
+
+def _parse_lookup_command_args(
+    argv: Sequence[str],
+    *,
+    prog: str,
+) -> tuple[str | None, str | None, str | None, int]:
+    parser = argparse.ArgumentParser(prog=prog)
+    parser.add_argument("query", nargs="*")
+    parser.add_argument("--name", nargs="+")
+    parser.add_argument("--title", nargs="+")
+    parser.add_argument("--limit", type=int, default=20)
+    args = parser.parse_args(list(argv))
+    query, name, title = _normalize_lookup_terms(args)
+    if not query and not name and not title:
+        raise CliError("Search query cannot be empty.")
+    return query, name, title, args.limit
+
+
+def _normalize_lookup_terms(args: argparse.Namespace) -> tuple[str | None, str | None, str | None]:
+    if args.query and (args.name or args.title):
+        raise CliError("Use either positional search terms or --name/--title, not both.")
+    query = " ".join(args.query) if args.query else None
+    name = " ".join(args.name) if args.name else None
+    title = " ".join(args.title) if args.title else None
+    return query, name, title
+
+
+def _pdf_filename(arxiv_id: str) -> str:
+    safe = arxiv_id.strip().replace("/", "_")
+    if not safe.lower().endswith(".pdf"):
+        safe = f"{safe}.pdf"
+    return safe
 
 
 def _terminal_link(text: str, url: str) -> str:
@@ -395,7 +596,8 @@ def _double_confirm_large_additions(
     if not getattr(stdin, "isatty", lambda: False)():
         raise CliError(f"Refusing to {action} {count} entries non-interactively; rerun in a terminal to confirm.")
 
-    stdout.write(f"{count} entries are about to be {action}d.\n")
+    past = {"add": "added", "update": "updated", "download": "downloaded"}.get(action, f"{action}d")
+    stdout.write(f"{count} entries are about to be {past}.\n")
     stdout.write("Continue? [y/N]: ")
     _flush_output(stdout)
     first = stdin.readline().strip().lower()
@@ -426,7 +628,7 @@ def _bash_completion_script() -> str:
     return """# bash completion for bibtool
 _bibtool_completion() {
     local cur prev cword
-    local root_opts search_opts update_opts
+    local root_opts search_opts download_opts update_opts
 
     COMPREPLY=()
     cur="${COMP_WORDS[COMP_CWORD]}"
@@ -435,8 +637,9 @@ _bibtool_completion() {
         prev="${COMP_WORDS[COMP_CWORD-1]}"
     fi
     cword=${COMP_CWORD}
-    root_opts="search update --bib --query --name --title --y --print-completion --install-completion -h --help"
+    root_opts="search download update --bib --query --name --title --y --print-completion --install-completion -h --help"
     search_opts="--name --title --limit -h --help"
+    download_opts="--name --title --arxiv --inspire --limit --dir --y -h --help"
     update_opts="--bib --workers -h --help"
 
     case "${prev}" in
@@ -444,11 +647,15 @@ _bibtool_completion() {
             COMPREPLY=( $(compgen -f -X '!*.bib' -- "${cur}") )
             return
             ;;
+        --dir)
+            COMPREPLY=( $(compgen -d -- "${cur}") )
+            return
+            ;;
         --print-completion|--install-completion)
             COMPREPLY=( $(compgen -W "bash" -- "${cur}") )
             return
             ;;
-        --limit|--query|--name|--title)
+        --limit|--query|--name|--title|--arxiv|--inspire)
             return
             ;;
     esac
@@ -461,6 +668,13 @@ _bibtool_completion() {
     if [[ "${COMP_WORDS[1]}" == "search" ]]; then
         if [[ "${cur}" == -* ]]; then
             COMPREPLY=( $(compgen -W "${search_opts}" -- "${cur}") )
+        fi
+        return
+    fi
+
+    if [[ "${COMP_WORDS[1]}" == "download" ]]; then
+        if [[ "${cur}" == -* ]]; then
+            COMPREPLY=( $(compgen -W "${download_opts}" -- "${cur}") )
         fi
         return
     fi

@@ -7,7 +7,7 @@ import re
 from typing import Any, Callable
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 
 from .bibtex import (
     BibEntry,
@@ -161,6 +161,47 @@ class InspireClient:
             if isinstance(metadata, dict):
                 entry = enrich_entry_from_metadata(entry, metadata)
         return normalize_inspire_entry(entry)
+
+    def fetch_result_by_recid(self, recid: int) -> SearchResult:
+        payload = self._request_json(f"{self.base_url}/{recid}?format=json")
+        metadata = payload.get("metadata")
+        if not isinstance(metadata, dict):
+            raise InspireError(f"INSPIRE returned no metadata for record {recid}.")
+        results = _search_results_from_hits([{"id": recid, "metadata": metadata}])
+        if not results:
+            raise InspireError(f"INSPIRE returned an unusable record {recid}.")
+        return results[0]
+
+    def fetch_result_by_arxiv(self, arxiv_id: str) -> SearchResult:
+        cleaned = normalize_arxiv_id(arxiv_id)
+        if not cleaned:
+            raise InspireError("arXiv id cannot be empty.")
+        results = self._search_records(f"eprint:{cleaned}", matcher=lambda _result: True, limit=5)
+        if not results:
+            # Still allow downloads when INSPIRE has no hit; arXiv id is enough for the PDF URL.
+            return SearchResult(recid=0, title=cleaned, authors=[], year="", arxiv_id=cleaned)
+        preferred = _pick_preferred_recid(results)
+        chosen = next((result for result in results if result.recid == preferred), results[0])
+        return SearchResult(
+            recid=chosen.recid,
+            title=chosen.title,
+            authors=list(chosen.authors),
+            year=chosen.year,
+            abstract=chosen.abstract,
+            has_journal_publication=chosen.has_journal_publication,
+            arxiv_id=chosen.arxiv_id or cleaned,
+        )
+
+    def fetch_pdf(self, arxiv_id: str) -> bytes:
+        """Download a PDF from arXiv using an eprint id from INSPIRE metadata.
+
+        Uses the static arXiv PDF URL, not the arXiv API.
+        """
+        cleaned = normalize_arxiv_id(arxiv_id)
+        if not cleaned:
+            raise InspireError("arXiv id cannot be empty.")
+        url = f"https://arxiv.org/pdf/{cleaned}"
+        return self._request_bytes(url)
 
     def lookup_recid(self, entry: BibEntry) -> int | None:
         eprint = strip_outer_wrappers(entry.fields.get("eprint", ""))
@@ -334,6 +375,17 @@ class InspireClient:
         _TEXT_CACHE[url] = body
         return body
 
+    def _request_bytes(self, url: str) -> bytes:
+        request = Request(url, headers={"User-Agent": "bibtool/0.1"})
+        try:
+            with urlopen(request, timeout=max(self.timeout, 30.0)) as response:
+                data = response.read()
+        except (HTTPError, URLError) as error:
+            raise InspireError(f"Unable to download PDF: {error}") from error
+        if not data.startswith(b"%PDF"):
+            raise InspireError(f"Download from {url} did not return a PDF.")
+        return data
+
 
 def _normalize_doi(value: str) -> str:
     doi = strip_outer_wrappers(value)
@@ -383,6 +435,67 @@ def _arxiv_id_from_metadata(metadata: dict[str, Any]) -> str:
         if value:
             return str(value)
     return ""
+
+
+_ARXIV_NEW_RE = re.compile(r"(?i)^(?:arXiv:)?(\d{4}\.\d{4,5})(?:v\d+)?$")
+_ARXIV_OLD_RE = re.compile(r"(?i)^(?:arXiv:)?([a-z-]+/\d{7})(?:v\d+)?$")
+_ARXIV_URL_RE = re.compile(
+    r"(?i)^https?://(?:www\.)?arxiv\.org/(?:abs|pdf)/([^?\s#]+?)(?:\.pdf)?(?:v\d+)?$"
+)
+_INSPIRE_URL_RE = re.compile(r"(?i)^https?://inspirehep\.net/(?:api/)?literature/(\d+)/?$")
+_INSPIRE_PREFIX_RE = re.compile(r"(?i)^(?:inspire:|recid:)?(\d{5,})$")
+
+
+def normalize_arxiv_id(value: str) -> str:
+    token = value.strip()
+    if not token:
+        return ""
+    url_match = _ARXIV_URL_RE.match(token)
+    if url_match:
+        token = url_match.group(1)
+    token = re.sub(r"(?i)^arXiv:", "", token).strip()
+    token = re.sub(r"(?i)\.pdf$", "", token).strip()
+    token = re.sub(r"v\d+$", "", token).strip()
+    new_match = _ARXIV_NEW_RE.match(token) or _ARXIV_NEW_RE.match(f"arXiv:{token}")
+    if new_match:
+        return new_match.group(1)
+    old_match = _ARXIV_OLD_RE.match(token) or _ARXIV_OLD_RE.match(f"arXiv:{token}")
+    if old_match:
+        return old_match.group(1)
+    return token
+
+
+def parse_literature_id(token: str) -> tuple[str, str] | None:
+    """Parse a literature identifier.
+
+    Returns ``("arxiv", arxiv_id)`` or ``("inspire", recid)``, or ``None`` if the
+    token does not look like an id.
+    """
+    raw = token.strip()
+    if not raw:
+        return None
+
+    inspire_url = _INSPIRE_URL_RE.match(raw)
+    if inspire_url:
+        return ("inspire", inspire_url.group(1))
+
+    arxiv_url = _ARXIV_URL_RE.match(raw)
+    if arxiv_url:
+        return ("arxiv", normalize_arxiv_id(raw))
+
+    new_match = _ARXIV_NEW_RE.match(raw)
+    if new_match:
+        return ("arxiv", new_match.group(1))
+
+    old_match = _ARXIV_OLD_RE.match(raw)
+    if old_match:
+        return ("arxiv", old_match.group(1))
+
+    inspire_match = _INSPIRE_PREFIX_RE.match(raw)
+    if inspire_match:
+        return ("inspire", inspire_match.group(1))
+
+    return None
 
 
 def _title_from_metadata(metadata: dict[str, Any]) -> str:

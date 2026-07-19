@@ -12,7 +12,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from bibtool.cli import run
 from bibtool.bibtex import BibEntry
-from bibtool.inspire import InspireClient, SearchResult, clear_response_caches
+from bibtool.inspire import (
+    InspireClient,
+    InspireError,
+    SearchResult,
+    clear_response_caches,
+    parse_literature_id,
+)
 
 
 class TtyStringIO(io.StringIO):
@@ -56,6 +62,11 @@ class StubProvider:
         self.seen_queries: list[tuple[str, int | None]] = []
         self.seen_name_title_queries: list[tuple[str, str, int | None]] = []
         self.fetch_calls: list[tuple[str, str]] = []
+        self.pdf_calls: list[str] = []
+        self.pdf_data: dict[str, bytes] = {}
+        self.pdf_errors: dict[str, Exception] = {}
+        self.recid_calls: list[int] = []
+        self.arxiv_id_calls: list[str] = []
 
     def _build_catalog(self) -> list[tuple[int, BibEntry]]:
         catalog: list[tuple[int, BibEntry]] = []
@@ -110,6 +121,41 @@ class StubProvider:
             for recid, entry in matched
         ]
 
+    def fetch_pdf(self, arxiv_id: str) -> bytes:
+        self.pdf_calls.append(arxiv_id)
+        if arxiv_id in self.pdf_errors:
+            raise self.pdf_errors[arxiv_id]
+        return self.pdf_data.get(arxiv_id, b"%PDF-1.4 stub")
+
+    def fetch_result_by_recid(self, recid: int) -> SearchResult:
+        self.recid_calls.append(recid)
+        for catalog_recid, entry in self.catalog:
+            if catalog_recid == recid:
+                return SearchResult(
+                    recid=catalog_recid,
+                    title=entry.title,
+                    authors=[part.strip() for part in entry.author.split(" and ") if part.strip()],
+                    year=entry.year,
+                    arxiv_id=entry.fields.get("eprint", ""),
+                )
+        raise InspireError(f"INSPIRE returned no metadata for record {recid}.")
+
+    def fetch_result_by_arxiv(self, arxiv_id: str) -> SearchResult:
+        from bibtool.inspire import normalize_arxiv_id
+
+        cleaned = normalize_arxiv_id(arxiv_id)
+        self.arxiv_id_calls.append(cleaned)
+        for catalog_recid, entry in self.catalog:
+            if entry.fields.get("eprint", "") == cleaned:
+                return SearchResult(
+                    recid=catalog_recid,
+                    title=entry.title,
+                    authors=[part.strip() for part in entry.author.split(" and ") if part.strip()],
+                    year=entry.year,
+                    arxiv_id=cleaned,
+                )
+        return SearchResult(recid=0, title=cleaned, authors=[], year="", arxiv_id=cleaned)
+
     def fetch_query_entries(self, query: str, limit: int | None = None):
         self.fetch_calls.append(("query", query))
         return self.lookup(query=query, limit=limit, as_entries=True)
@@ -137,6 +183,22 @@ class StubProvider:
     def search_name_and_title(self, name: str, title: str, limit: int | None = 20):
         self.seen_name_title_queries.append((name, title, limit))
         return self.lookup(name=name, title=title, limit=limit, as_entries=False)
+
+
+class LiteratureIdParsingTests(unittest.TestCase):
+    def test_parse_arxiv_and_inspire_ids(self) -> None:
+        self.assertEqual(parse_literature_id("2501.12345"), ("arxiv", "2501.12345"))
+        self.assertEqual(parse_literature_id("arXiv:2501.12345v2"), ("arxiv", "2501.12345"))
+        self.assertEqual(parse_literature_id("https://arxiv.org/pdf/2501.12345.pdf"), ("arxiv", "2501.12345"))
+        self.assertEqual(parse_literature_id("hep-ph/9901001"), ("arxiv", "hep-ph/9901001"))
+        self.assertEqual(parse_literature_id("2738695"), ("inspire", "2738695"))
+        self.assertEqual(parse_literature_id("inspire:2738695"), ("inspire", "2738695"))
+        self.assertEqual(
+            parse_literature_id("https://inspirehep.net/literature/2738695"),
+            ("inspire", "2738695"),
+        )
+        self.assertIsNone(parse_literature_id("GWTC-5"))
+        self.assertIsNone(parse_literature_id("2024"))
 
 
 class BibtoolCliTests(unittest.TestCase):
@@ -619,6 +681,257 @@ class BibtoolCliTests(unittest.TestCase):
         self.assertEqual(exit_code, 1)
         self.assertIn("Use either positional search terms or --name/--title, not both.", stderr.getvalue())
 
+    def test_download_writes_pdfs_for_matching_arxiv_records(self) -> None:
+        provider = StubProvider(
+            query_results=[
+                SearchResult(
+                    recid=101,
+                    title="Searching For Gravitational Waves",
+                    authors=["Hannuksela, Otto"],
+                    year="2025",
+                    arxiv_id="2501.12345",
+                ),
+                SearchResult(
+                    recid=102,
+                    title="Searching For Something Else",
+                    authors=["Someone Else"],
+                    year="2024",
+                ),
+            ]
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            dest = Path(tmp)
+            stdout = io.StringIO()
+            exit_code = run(
+                ["download", "searching", "for", "--dir", str(dest)],
+                stdout=stdout,
+                stderr=io.StringIO(),
+                provider=provider,
+            )
+
+            pdf_path = dest / "2501.12345.pdf"
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(provider.lookup_calls[0], ("searching for", None, None, 20, False))
+            self.assertEqual(provider.pdf_calls, ["2501.12345"])
+            self.assertTrue(pdf_path.exists())
+            self.assertEqual(pdf_path.read_bytes(), b"%PDF-1.4 stub")
+            self.assertIn(f"Downloaded {pdf_path}", stdout.getvalue())
+            self.assertIn("Skipped 1 records without an arXiv eprint.", stdout.getvalue())
+
+    def test_download_skips_existing_pdfs(self) -> None:
+        provider = StubProvider(
+            query_results=[
+                SearchResult(
+                    recid=101,
+                    title="Searching For Gravitational Waves",
+                    authors=["Hannuksela, Otto"],
+                    year="2025",
+                    arxiv_id="2501.12345",
+                ),
+            ]
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            dest = Path(tmp)
+            existing = dest / "2501.12345.pdf"
+            existing.write_bytes(b"%PDF-1.4 existing")
+            stdout = io.StringIO()
+            exit_code = run(
+                ["download", "searching", "--dir", str(dest)],
+                stdout=stdout,
+                stderr=io.StringIO(),
+                provider=provider,
+            )
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(provider.pdf_calls, [])
+            self.assertEqual(existing.read_bytes(), b"%PDF-1.4 existing")
+            self.assertIn("All 1 matching PDFs already exist", stdout.getvalue())
+
+    def test_download_uses_same_name_title_lookup_as_search(self) -> None:
+        provider = StubProvider(
+            catalog=[
+                (
+                    301,
+                    _entry(
+                        "AuthorKey",
+                        author="Hannuksela, Otto",
+                        title="GWTC-5 Author Match",
+                        year="2024",
+                        eprint="2401.00001",
+                    ),
+                ),
+            ],
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            dest = Path(tmp)
+            exit_code = run(
+                ["download", "--name", "Otto", "Hannuksela", "--title", "GWTC-5", "--dir", str(dest)],
+                stdout=io.StringIO(),
+                stderr=io.StringIO(),
+                provider=provider,
+            )
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(provider.lookup_calls[0][:4], (None, "Otto Hannuksela", "GWTC-5", 20))
+            self.assertEqual(provider.pdf_calls, ["2401.00001"])
+            self.assertTrue((dest / "2401.00001.pdf").exists())
+
+    def test_download_sanitizes_legacy_arxiv_filenames(self) -> None:
+        provider = StubProvider(
+            query_results=[
+                SearchResult(
+                    recid=55,
+                    title="Legacy Paper",
+                    authors=["Author, A."],
+                    year="1999",
+                    arxiv_id="hep-ph/9901001",
+                ),
+            ]
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            dest = Path(tmp)
+            exit_code = run(
+                ["download", "legacy", "--dir", str(dest)],
+                stdout=io.StringIO(),
+                stderr=io.StringIO(),
+                provider=provider,
+            )
+
+            self.assertEqual(exit_code, 0)
+            self.assertTrue((dest / "hep-ph_9901001.pdf").exists())
+
+    def test_download_by_arxiv_id(self) -> None:
+        provider = StubProvider(
+            catalog=[
+                (
+                    101,
+                    _entry(
+                        "ArxivKey",
+                        author="Hannuksela, Otto",
+                        title="By Arxiv Id",
+                        year="2025",
+                        eprint="2501.12345",
+                    ),
+                ),
+            ]
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            dest = Path(tmp)
+            stdout = io.StringIO()
+            exit_code = run(
+                ["download", "arXiv:2501.12345v2", "--dir", str(dest)],
+                stdout=stdout,
+                stderr=io.StringIO(),
+                provider=provider,
+            )
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(provider.lookup_calls, [])
+            self.assertEqual(provider.arxiv_id_calls, ["2501.12345"])
+            self.assertEqual(provider.pdf_calls, ["2501.12345"])
+            self.assertTrue((dest / "2501.12345.pdf").exists())
+
+    def test_download_by_inspire_id(self) -> None:
+        provider = StubProvider(
+            catalog=[
+                (
+                    2738695,
+                    _entry(
+                        "InspireKey",
+                        author="Cornish, Neil",
+                        title="By Inspire Id",
+                        year="2024",
+                        eprint="2312.11808",
+                    ),
+                ),
+            ]
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            dest = Path(tmp)
+            exit_code = run(
+                ["download", "2738695", "--dir", str(dest)],
+                stdout=io.StringIO(),
+                stderr=io.StringIO(),
+                provider=provider,
+            )
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(provider.lookup_calls, [])
+            self.assertEqual(provider.recid_calls, [2738695])
+            self.assertEqual(provider.pdf_calls, ["2312.11808"])
+            self.assertTrue((dest / "2312.11808.pdf").exists())
+
+    def test_download_by_explicit_arxiv_and_inspire_flags(self) -> None:
+        provider = StubProvider(
+            catalog=[
+                (
+                    101,
+                    _entry("A", author="A", title="A", year="2025", eprint="2501.12345"),
+                ),
+                (
+                    202,
+                    _entry("B", author="B", title="B", year="2024", eprint="2401.00001"),
+                ),
+            ]
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            dest = Path(tmp)
+            exit_code = run(
+                ["download", "--arxiv", "2501.12345", "--inspire", "202", "--dir", str(dest)],
+                stdout=io.StringIO(),
+                stderr=io.StringIO(),
+                provider=provider,
+            )
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(provider.arxiv_id_calls, ["2501.12345"])
+            self.assertEqual(provider.recid_calls, [202])
+            self.assertEqual(sorted(provider.pdf_calls), ["2401.00001", "2501.12345"])
+            self.assertTrue((dest / "2501.12345.pdf").exists())
+            self.assertTrue((dest / "2401.00001.pdf").exists())
+
+    def test_download_rejects_mixed_ids_and_search_terms(self) -> None:
+        stderr = io.StringIO()
+        exit_code = run(
+            ["download", "2501.12345", "Hannuksela"],
+            stdout=io.StringIO(),
+            stderr=stderr,
+            provider=StubProvider(),
+        )
+
+        self.assertEqual(exit_code, 1)
+        self.assertIn("Mix of literature ids and search terms is not supported", stderr.getvalue())
+
+    def test_download_inspire_id_without_arxiv_is_skipped(self) -> None:
+        provider = StubProvider(
+            catalog=[
+                (
+                    404,
+                    _entry("NoArxiv", author="Author, A.", title="No Eprint", year="2020"),
+                ),
+            ]
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            stdout = io.StringIO()
+            exit_code = run(
+                ["download", "--inspire", "404", "--dir", tmp],
+                stdout=stdout,
+                stderr=io.StringIO(),
+                provider=provider,
+            )
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(provider.pdf_calls, [])
+            self.assertIn("No matching records with an arXiv eprint to download.", stdout.getvalue())
+
     def test_title_alias_uses_title_fetch_path(self) -> None:
         provider = StubProvider(
             query_entries=[_entry("RemoteKey", author="Hannuksela, Otto", title="GWTC-5 Methods", year="2024")]
@@ -714,17 +1027,20 @@ class FakeInspireClient(InspireClient):
         return self.pages.pop(0) if self.pages else {"hits": {"hits": []}}
 
 
-def _entry(key: str, *, author: str, title: str, year: str):
+def _entry(key: str, *, author: str, title: str, year: str, eprint: str | None = None):
     from bibtool.bibtex import BibEntry
 
+    fields = {
+        "author": author,
+        "title": title,
+        "year": year,
+    }
+    if eprint:
+        fields["eprint"] = eprint
     return BibEntry(
         entry_type="article",
         key=key,
-        fields={
-            "author": author,
-            "title": title,
-            "year": year,
-        },
+        fields=fields,
     )
 
 

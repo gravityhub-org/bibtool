@@ -21,6 +21,11 @@ bibtool --name Otto Hannuksela --title GWTC-5
 bibtool --title GWTC-5
 bibtool search "searching for"
 bibtool search --name Otto Hannuksela --title GWTC-5
+bibtool download "searching for"
+bibtool download --name Otto Hannuksela --title GWTC-5 --dir papers
+bibtool download 2501.12345
+bibtool download 2738695
+bibtool download --arxiv 2501.12345 --inspire 2738695 --dir papers
 bibtool --install-completion
 ```
 
@@ -31,6 +36,10 @@ bibtool --install-completion
 - `--query`, `--name`, and `--title` import into `$LATEX_TEMPLATE_DIR/references.bib` by default, or another file via `--bib`.
 - `--name` and `--title` can be combined in one import command; their results are merged and de-duplicated before writing.
 - `search` takes plain search terms and queries INSPIRE HEP without modifying files.
+- `download` uses the same search query as `search`, then downloads matching arXiv PDFs (via INSPIRE eprint ids) into `--dir` (default: current directory).
+- `download` also accepts arXiv ids (`2501.12345`, `arXiv:…`, abs/pdf URLs) and INSPIRE record ids (`2738695`, `inspire:…`, literature URLs), including `--arxiv` / `--inspire`.
+- Records without an arXiv eprint are skipped; existing PDFs are left untouched.
+- Large downloads (>10 new PDFs) require two interactive confirmations unless `--y` is passed.
 - `update` refreshes every entry in a bibliography from INSPIRE, preserving existing BibTeX keys.
 - `update` never prompts for confirmation; import and merge still require confirmation for large batches unless `--y` is passed.
 - `update` defaults to `$LATEX_TEMPLATE_DIR/references.bib`, or accepts a path/`--bib`.

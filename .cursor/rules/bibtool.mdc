@@ -38,7 +38,9 @@ Literature metadata comes from **INSPIRE HEP only** (`inspirehep.net/api/literat
 - Default import/update target: `$LATEX_TEMPLATE_DIR/references.bib` (override with path/`--bib`).
 - Large imports (>10 entries): require double confirm unless `--y`.
 - `update` never prompts; may parallelize with `--workers`.
-
+- `download` mirrors `search` query flags; writes arXiv PDFs to `--dir` (default `.`); large batches need `--y` or double confirm.
+- `download` accepts arXiv / INSPIRE ids (positional or `--arxiv` / `--inspire`).
+- Do not call the arXiv API; PDF downloads use static `arxiv.org/pdf/{eprint}` URLs from INSPIRE eprint ids.
 ## Tests
 
 ```bash
