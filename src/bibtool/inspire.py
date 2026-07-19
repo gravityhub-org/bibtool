@@ -4,7 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 import json
 import re
-from typing import Any, Callable
+from typing import Any, Callable, Sequence
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
@@ -76,11 +76,50 @@ class InspireClient:
         limit: int | None = 20,
         as_entries: bool = False,
     ) -> list[SearchResult] | list[BibEntry]:
+        if query is not None and name is None and title is None:
+            parsed_ids = parse_literature_id_tokens(_query_tokens(query))
+            if parsed_ids is not None:
+                results = self.results_from_literature_ids(parsed_ids)
+                if limit is not None:
+                    results = results[:limit]
+                if not as_entries:
+                    return results
+                return [self._entry_from_id_result(result) for result in results]
+
         spec = self.resolve_lookup(query=query, name=name, title=title)
         results = self._search_records(spec.query, matcher=spec.result_matcher, limit=limit)
         if not as_entries:
             return results
         return [self.fetch_entry(result.recid) for result in results]
+
+    def results_from_literature_ids(self, parsed_ids: Sequence[tuple[str, str]]) -> list[SearchResult]:
+        """Resolve arXiv / INSPIRE ids via INSPIRE only (no arXiv API)."""
+        results: list[SearchResult] = []
+        seen_keys: set[str] = set()
+        for kind, value in parsed_ids:
+            if kind == "arxiv":
+                result = self.fetch_result_by_arxiv(value)
+                key = result.arxiv_id or f"arxiv:{value}"
+            elif kind == "inspire":
+                try:
+                    recid = int(str(value).strip())
+                except ValueError as error:
+                    raise InspireError(f"Invalid INSPIRE id: {value}") from error
+                result = self.fetch_result_by_recid(recid)
+                key = result.arxiv_id or f"inspire:{result.recid}"
+            else:
+                raise InspireError(f"Unknown literature id kind: {kind}")
+            if key in seen_keys:
+                continue
+            seen_keys.add(key)
+            results.append(result)
+        return results
+
+    def _entry_from_id_result(self, result: SearchResult) -> BibEntry:
+        if not result.recid:
+            label = f"arXiv:{result.arxiv_id}" if result.arxiv_id else "record"
+            raise InspireError(f"No INSPIRE record found for {label}.")
+        return self.fetch_entry(result.recid)
 
     def resolve_lookup(
         self,
@@ -503,6 +542,31 @@ def parse_literature_id(token: str) -> tuple[str, str] | None:
         return ("inspire", inspire_match.group(1))
 
     return None
+
+
+def parse_literature_id_tokens(tokens: Sequence[str]) -> list[tuple[str, str]] | None:
+    """Parse a token list as literature ids.
+
+    Returns parsed ``(kind, value)`` pairs when every token is an id.
+    Returns ``None`` when no token looks like an id.
+    Raises ``InspireError`` when ids and non-id search terms are mixed.
+    """
+    parsed_items: list[tuple[str, str]] = []
+    saw_id = False
+    saw_non_id = False
+    for token in tokens:
+        parsed = parse_literature_id(token)
+        if parsed is None:
+            saw_non_id = True
+            continue
+        saw_id = True
+        parsed_items.append(parsed)
+
+    if saw_id and saw_non_id:
+        raise InspireError("Mix of literature ids and search terms is not supported; use one or the other.")
+    if not saw_id:
+        return None
+    return parsed_items
 
 
 def _title_from_metadata(metadata: dict[str, Any]) -> str:

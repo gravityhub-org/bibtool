@@ -31,6 +31,7 @@ Literature metadata comes from **INSPIRE HEP only** (`inspirehep.net/api/literat
 - arXiv-only `@article`: set `journal = {arXiv}` for REVTeX/APS.
 - Sort output by year, then first author, then title.
 - `search`/`import` share `resolve_lookup` — keep search and fetch query/matcher parity.
+- Free-text `search`/`--query` tokens that are all arXiv or INSPIRE ids resolve via INSPIRE (`eprint:` / record JSON), never the arXiv API.
 - Search: loose INSPIRE keyword query, then local case-insensitive AND filter on metadata.
 - Year tokens (`19xx`/`20xx`) in free-text query → INSPIRE `date:YYYY` + local year match.
 
@@ -41,6 +42,7 @@ Literature metadata comes from **INSPIRE HEP only** (`inspirehep.net/api/literat
 - `update` never prompts; may parallelize with `--workers`.
 - `download` mirrors `search` query flags; writes arXiv PDFs to `--dir` (default `.`); large batches need `--y` or double confirm.
 - `download` accepts arXiv / INSPIRE ids (positional or `--arxiv` / `--inspire`).
+- `search` and `--query` also accept those ids (positional; `search` also supports `--arxiv` / `--inspire`).
 - Do not call the arXiv API; PDF downloads use static `arxiv.org/pdf/{eprint}` URLs from INSPIRE eprint ids.
 ## Tests
 

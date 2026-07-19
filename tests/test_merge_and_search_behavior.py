@@ -288,6 +288,68 @@ class InspireBehaviorTests(unittest.TestCase):
 
         self.assertEqual([result.arxiv_id for result in results], ["2501.12345", ""])
 
+    def test_lookup_by_arxiv_id_uses_inspire_eprint_query(self) -> None:
+        client = RecordingLookupClient(
+            pages=[
+                _search_page(
+                    _search_hit(
+                        recid=101,
+                        title="By Arxiv Id",
+                        author="Hannuksela, Otto",
+                        year="2025",
+                        arxiv_id="2501.12345",
+                    )
+                )
+            ],
+            bibtex_by_recid={
+                101: """@article{ByArxiv,
+  author = {Hannuksela, Otto},
+  title = {By Arxiv Id},
+  eprint = {2501.12345},
+  year = {2025}
+}
+""",
+            },
+        )
+
+        results = client.lookup(query="arXiv:2501.12345v2", limit=5, as_entries=False)
+        entries = client.lookup(query="2501.12345", limit=None, as_entries=True)
+
+        self.assertEqual([result.recid for result in results], [101])
+        self.assertEqual([entry.key for entry in entries], ["ByArxiv"])
+        self.assertTrue(any("eprint" in url for url in client.requested_urls))
+        self.assertTrue(any("2501.12345" in url for url in client.requested_urls))
+        self.assertFalse(any("arxiv.org/api" in url for url in client.requested_urls))
+
+    def test_lookup_by_inspire_id_fetches_record_json(self) -> None:
+        hit = _search_hit(
+            recid=2738695,
+            title="By Inspire Id",
+            author="Cornish, Neil",
+            year="2024",
+            arxiv_id="2312.11808",
+        )
+        client = RecordingLookupClient(
+            pages=[{"metadata": hit["metadata"]}],
+            bibtex_by_recid={
+                2738695: """@article{ByInspire,
+  author = {Cornish, Neil},
+  title = {By Inspire Id},
+  eprint = {2312.11808},
+  year = {2024}
+}
+""",
+            },
+        )
+
+        results = client.lookup(query="inspire:2738695", limit=5, as_entries=False)
+        entries = client.lookup(query="2738695", limit=None, as_entries=True)
+
+        self.assertEqual([result.recid for result in results], [2738695])
+        self.assertEqual(results[0].arxiv_id, "2312.11808")
+        self.assertEqual([entry.key for entry in entries], ["ByInspire"])
+        self.assertTrue(any(url.endswith("/2738695?format=json") for url in client.requested_urls))
+
     def test_fetch_entry_adds_arxiv_journal_for_preprints(self) -> None:
         client = RecordingLookupClient(
             pages=[],

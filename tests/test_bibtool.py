@@ -18,6 +18,7 @@ from bibtool.inspire import (
     SearchResult,
     clear_response_caches,
     parse_literature_id,
+    parse_literature_id_tokens,
 )
 
 
@@ -97,6 +98,24 @@ class StubProvider:
         as_entries: bool = False,
     ):
         self.lookup_calls.append((query, name, title, limit, as_entries))
+        if query is not None and name is None and title is None:
+            from bibtool.inspire import parse_literature_id_tokens
+
+            parsed_ids = parse_literature_id_tokens(query.split())
+            if parsed_ids is not None:
+                results = self.results_from_literature_ids(parsed_ids)
+                if limit is not None:
+                    results = results[:limit]
+                if not as_entries:
+                    return results
+                entries: list[BibEntry] = []
+                for result in results:
+                    if not result.recid:
+                        label = f"arXiv:{result.arxiv_id}" if result.arxiv_id else "record"
+                        raise InspireError(f"No INSPIRE record found for {label}.")
+                    entries.append(self.fetch_entry(result.recid))
+                return entries
+
         spec = InspireClient().resolve_lookup(query=query, name=name, title=title)
         matched: list[tuple[int, BibEntry]] = []
         seen_recids: set[int] = set()
@@ -120,6 +139,15 @@ class StubProvider:
             )
             for recid, entry in matched
         ]
+
+    def results_from_literature_ids(self, parsed_ids):
+        return InspireClient.results_from_literature_ids(self, parsed_ids)
+
+    def fetch_entry(self, recid: int) -> BibEntry:
+        for catalog_recid, entry in self.catalog:
+            if catalog_recid == recid:
+                return entry
+        raise InspireError(f"INSPIRE returned no BibTeX for record {recid}.")
 
     def fetch_pdf(self, arxiv_id: str) -> bytes:
         self.pdf_calls.append(arxiv_id)
@@ -199,6 +227,15 @@ class LiteratureIdParsingTests(unittest.TestCase):
         )
         self.assertIsNone(parse_literature_id("GWTC-5"))
         self.assertIsNone(parse_literature_id("2024"))
+
+    def test_parse_literature_id_tokens_all_or_none(self) -> None:
+        self.assertEqual(
+            parse_literature_id_tokens(["arXiv:2501.12345v1", "2738695"]),
+            [("arxiv", "2501.12345"), ("inspire", "2738695")],
+        )
+        self.assertIsNone(parse_literature_id_tokens(["GWTC-5", "Hannuksela"]))
+        with self.assertRaisesRegex(InspireError, "Mix of literature ids"):
+            parse_literature_id_tokens(["2501.12345", "Hannuksela"])
 
 
 class BibtoolCliTests(unittest.TestCase):
@@ -680,6 +717,144 @@ class BibtoolCliTests(unittest.TestCase):
 
         self.assertEqual(exit_code, 1)
         self.assertIn("Use either positional search terms or --name/--title, not both.", stderr.getvalue())
+
+    def test_search_by_arxiv_and_inspire_ids(self) -> None:
+        provider = StubProvider(
+            catalog=[
+                (
+                    101,
+                    _entry(
+                        "ArxivKey",
+                        author="Hannuksela, Otto",
+                        title="By Arxiv Id",
+                        year="2025",
+                        eprint="2501.12345",
+                    ),
+                ),
+                (
+                    2738695,
+                    _entry(
+                        "InspireKey",
+                        author="Cornish, Neil",
+                        title="By Inspire Id",
+                        year="2024",
+                        eprint="2312.11808",
+                    ),
+                ),
+            ]
+        )
+
+        stdout = io.StringIO()
+        exit_code = run(
+            ["search", "arXiv:2501.12345v2", "2738695"],
+            stdout=stdout,
+            stderr=io.StringIO(),
+            provider=provider,
+        )
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(provider.lookup_calls[0][0], "arXiv:2501.12345v2 2738695")
+        self.assertEqual(provider.arxiv_id_calls, ["2501.12345"])
+        self.assertEqual(provider.recid_calls, [2738695])
+        output = stdout.getvalue()
+        self.assertIn("By Arxiv Id", output)
+        self.assertIn("By Inspire Id", output)
+        self.assertIn("arXiv:2501.12345", output)
+
+    def test_search_by_explicit_arxiv_and_inspire_flags(self) -> None:
+        provider = StubProvider(
+            catalog=[
+                (
+                    101,
+                    _entry("A", author="A", title="A", year="2025", eprint="2501.12345"),
+                ),
+                (
+                    202,
+                    _entry("B", author="B", title="B", year="2024", eprint="2401.00001"),
+                ),
+            ]
+        )
+
+        stdout = io.StringIO()
+        exit_code = run(
+            ["search", "--arxiv", "2501.12345", "--inspire", "202"],
+            stdout=stdout,
+            stderr=io.StringIO(),
+            provider=provider,
+        )
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(provider.lookup_calls, [])
+        self.assertEqual(provider.arxiv_id_calls, ["2501.12345"])
+        self.assertEqual(provider.recid_calls, [202])
+        self.assertIn("[101]", stdout.getvalue())
+        self.assertIn("[202]", stdout.getvalue())
+
+    def test_search_rejects_mixed_ids_and_search_terms(self) -> None:
+        stderr = io.StringIO()
+        exit_code = run(
+            ["search", "2501.12345", "Hannuksela"],
+            stdout=io.StringIO(),
+            stderr=stderr,
+            provider=StubProvider(),
+        )
+
+        self.assertEqual(exit_code, 1)
+        self.assertIn("Mix of literature ids and search terms is not supported", stderr.getvalue())
+
+    def test_query_import_by_arxiv_and_inspire_ids(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "references.bib"
+            provider = StubProvider(
+                catalog=[
+                    (
+                        101,
+                        _entry(
+                            "ArxivKey",
+                            author="Hannuksela, Otto",
+                            title="By Arxiv Id",
+                            year="2025",
+                            eprint="2501.12345",
+                        ),
+                    ),
+                    (
+                        2738695,
+                        _entry(
+                            "InspireKey",
+                            author="Cornish, Neil",
+                            title="By Inspire Id",
+                            year="2024",
+                            eprint="2312.11808",
+                        ),
+                    ),
+                ]
+            )
+
+            exit_code = run(
+                ["--query", "2501.12345", "inspire:2738695", "--bib", str(target), "--y"],
+                stdout=io.StringIO(),
+                stderr=io.StringIO(),
+                provider=provider,
+            )
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(provider.arxiv_id_calls, ["2501.12345"])
+            self.assertEqual(provider.recid_calls, [2738695])
+            body = target.read_text(encoding="utf-8")
+            self.assertIn("By Arxiv Id", body)
+            self.assertIn("By Inspire Id", body)
+
+    def test_query_import_arxiv_id_without_inspire_record_fails(self) -> None:
+        stderr = io.StringIO()
+        exit_code = run(
+            ["--query", "2501.99999", "--bib", "/tmp/unused.bib", "--y"],
+            stdout=io.StringIO(),
+            stderr=stderr,
+            provider=StubProvider(catalog=[]),
+        )
+
+        self.assertEqual(exit_code, 1)
+        self.assertIn("No INSPIRE record found for arXiv:2501.99999", stderr.getvalue())
 
     def test_download_writes_pdfs_for_matching_arxiv_records(self) -> None:
         provider = StubProvider(

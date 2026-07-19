@@ -18,7 +18,12 @@ from .bibtex import (
     sort_key,
     write_bibtex,
 )
-from .inspire import InspireClient, InspireError, SearchResult, parse_literature_id
+from .inspire import (
+    InspireClient,
+    InspireError,
+    SearchResult,
+    parse_literature_id_tokens,
+)
 
 
 class CliError(RuntimeError):
@@ -223,15 +228,16 @@ def _refresh_entries(
 
 
 def _run_search(argv: Sequence[str], *, stdout: TextIO, provider: InspireClient) -> int:
-    query, name, title, limit = _parse_lookup_command_args(argv, prog="bibtool search")
+    parser = argparse.ArgumentParser(prog="bibtool search")
+    parser.add_argument("query", nargs="*")
+    parser.add_argument("--name", nargs="+")
+    parser.add_argument("--title", nargs="+")
+    parser.add_argument("--arxiv", nargs="+", dest="arxiv_ids")
+    parser.add_argument("--inspire", nargs="+", dest="inspire_ids")
+    parser.add_argument("--limit", type=int, default=20)
+    args = parser.parse_args(list(argv))
 
-    results = provider.lookup(
-        query=query,
-        name=name,
-        title=title,
-        limit=limit,
-        as_entries=False,
-    )
+    results = _resolve_search_results(args, provider=provider)
 
     if not results:
         stdout.write("No matching records found.\n")
@@ -245,6 +251,35 @@ def _run_search(argv: Sequence[str], *, stdout: TextIO, provider: InspireClient)
         arxiv = f" arXiv:{result.arxiv_id}" if result.arxiv_id else ""
         stdout.write(f"[{result.recid}] {author} ({year}) {linked_title}{arxiv}\n")
     return 0
+
+
+def _resolve_search_results(args: argparse.Namespace, *, provider: InspireClient) -> list[SearchResult]:
+    has_flags = bool(args.arxiv_ids or args.inspire_ids)
+    has_name_title = bool(args.name or args.title)
+    query_tokens = list(args.query or [])
+
+    if has_flags and (query_tokens or has_name_title):
+        raise CliError("Use --arxiv/--inspire by themselves, or a search query / --name/--title.")
+    if has_flags:
+        return _results_from_explicit_ids(
+            arxiv_ids=args.arxiv_ids or [],
+            inspire_ids=args.inspire_ids or [],
+            provider=provider,
+        )
+
+    query, name, title = _normalize_lookup_terms(args)
+    if not query and not name and not title:
+        raise CliError("Search query cannot be empty.")
+
+    return list(
+        provider.lookup(
+            query=query,
+            name=name,
+            title=title,
+            limit=args.limit,
+            as_entries=False,
+        )
+    )
 
 
 def _run_download(
@@ -367,25 +402,10 @@ def _maybe_results_from_query_ids(
     *,
     provider: InspireClient,
 ) -> list[SearchResult] | None:
-    parsed_items: list[tuple[str, str]] = []
-    saw_id = False
-    saw_non_id = False
-    for token in tokens:
-        parsed = parse_literature_id(token)
-        if parsed is None:
-            saw_non_id = True
-            continue
-        saw_id = True
-        parsed_items.append(parsed)
-
-    if saw_id and saw_non_id:
-        raise CliError("Mix of literature ids and search terms is not supported; use one or the other.")
-    if not saw_id:
+    parsed_items = parse_literature_id_tokens(tokens)
+    if parsed_items is None:
         return None
-
-    arxiv_ids = [value for kind, value in parsed_items if kind == "arxiv"]
-    inspire_ids = [value for kind, value in parsed_items if kind == "inspire"]
-    return _results_from_explicit_ids(arxiv_ids=arxiv_ids, inspire_ids=inspire_ids, provider=provider)
+    return _results_from_parsed_ids(parsed_items, provider=provider)
 
 
 def _results_from_explicit_ids(
@@ -394,54 +414,51 @@ def _results_from_explicit_ids(
     inspire_ids: Sequence[str],
     provider: InspireClient,
 ) -> list[SearchResult]:
+    parsed_items: list[tuple[str, str]] = []
+    for raw in arxiv_ids:
+        parsed_items.append(("arxiv", str(raw).strip()))
+    for raw in inspire_ids:
+        parsed_items.append(("inspire", str(raw).strip()))
+    return _results_from_parsed_ids(parsed_items, provider=provider)
+
+
+def _results_from_parsed_ids(
+    parsed_ids: Sequence[tuple[str, str]],
+    *,
+    provider: InspireClient,
+) -> list[SearchResult]:
+    resolve = getattr(provider, "results_from_literature_ids", None)
+    if callable(resolve):
+        return list(resolve(parsed_ids))
+
+    # Fallback for simple test stubs that only expose per-id fetch helpers.
     results: list[SearchResult] = []
     seen_keys: set[str] = set()
-
     fetch_by_arxiv = getattr(provider, "fetch_result_by_arxiv", None)
     fetch_by_recid = getattr(provider, "fetch_result_by_recid", None)
 
-    for raw in arxiv_ids:
-        if not callable(fetch_by_arxiv):
-            raise CliError("Provider does not support arXiv id lookup.")
-        result = fetch_by_arxiv(raw)
-        key = result.arxiv_id or f"arxiv:{raw}"
+    for kind, value in parsed_ids:
+        if kind == "arxiv":
+            if not callable(fetch_by_arxiv):
+                raise CliError("Provider does not support arXiv id lookup.")
+            result = fetch_by_arxiv(value)
+            key = result.arxiv_id or f"arxiv:{value}"
+        elif kind == "inspire":
+            if not callable(fetch_by_recid):
+                raise CliError("Provider does not support INSPIRE id lookup.")
+            try:
+                recid = int(str(value).strip())
+            except ValueError as error:
+                raise CliError(f"Invalid INSPIRE id: {value}") from error
+            result = fetch_by_recid(recid)
+            key = result.arxiv_id or f"inspire:{result.recid}"
+        else:
+            raise CliError(f"Unknown literature id kind: {kind}")
         if key in seen_keys:
             continue
         seen_keys.add(key)
         results.append(result)
-
-    for raw in inspire_ids:
-        if not callable(fetch_by_recid):
-            raise CliError("Provider does not support INSPIRE id lookup.")
-        try:
-            recid = int(str(raw).strip())
-        except ValueError as error:
-            raise CliError(f"Invalid INSPIRE id: {raw}") from error
-        result = fetch_by_recid(recid)
-        key = result.arxiv_id or f"inspire:{result.recid}"
-        if key in seen_keys:
-            continue
-        seen_keys.add(key)
-        results.append(result)
-
     return results
-
-
-def _parse_lookup_command_args(
-    argv: Sequence[str],
-    *,
-    prog: str,
-) -> tuple[str | None, str | None, str | None, int]:
-    parser = argparse.ArgumentParser(prog=prog)
-    parser.add_argument("query", nargs="*")
-    parser.add_argument("--name", nargs="+")
-    parser.add_argument("--title", nargs="+")
-    parser.add_argument("--limit", type=int, default=20)
-    args = parser.parse_args(list(argv))
-    query, name, title = _normalize_lookup_terms(args)
-    if not query and not name and not title:
-        raise CliError("Search query cannot be empty.")
-    return query, name, title, args.limit
 
 
 def _normalize_lookup_terms(args: argparse.Namespace) -> tuple[str | None, str | None, str | None]:
@@ -638,7 +655,7 @@ _bibtool_completion() {
     fi
     cword=${COMP_CWORD}
     root_opts="search download update --bib --query --name --title --y --print-completion --install-completion -h --help"
-    search_opts="--name --title --limit -h --help"
+    search_opts="--name --title --arxiv --inspire --limit -h --help"
     download_opts="--name --title --arxiv --inspire --limit --dir --y -h --help"
     update_opts="--bib --workers -h --help"
 
