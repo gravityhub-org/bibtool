@@ -1,0 +1,17 @@
+---
+description: After code changes, add tests, run full suite, commit, and push
+alwaysApply: true
+---
+
+# Ship changes
+
+Whenever you add or change behavior in this repo, finish the work automatically:
+
+1. **Unit tests** — Add or update `unittest` coverage for the change (happy path + important edge). Prefer stubs/`FakeInspireClient`; clear caches with `clear_response_caches` when needed.
+2. **Test all** — Run and require green:
+   ```bash
+   python -m unittest discover -s tests
+   ```
+3. **Commit + push** — If tests pass and there are real changes, commit (clear message, why not what) and `git push -u origin HEAD`. Do not ask whether to commit/push; do it unless the user said not to, or secrets/credentials are involved.
+
+Skip push only when: user said so, tests fail, or nothing to commit.

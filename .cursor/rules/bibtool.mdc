@@ -49,3 +49,5 @@ python -m unittest discover -s tests
 ```
 
 Clear INSPIRE response caches between tests that hit HTTP helpers (`clear_response_caches`).
+
+See `ship-changes.mdc`: new behavior → unit tests → full suite green → commit + push.
