@@ -1000,6 +1000,26 @@ class InspireClientTests(unittest.TestCase):
         self.assertIn("size=50", client.requested_urls[0])
         self.assertIn("publication_info", client.requested_urls[0])
 
+    def test_search_author_and_year_uses_date_filter(self) -> None:
+        client = FakeInspireClient(
+            pages=[
+                _search_page(
+                    [
+                        _search_hit(recid=1, title="Lens Dynamics", author="Koopmans, L.V.E.", year="2009"),
+                        _search_hit(recid=2, title="Later Work", author="Koopmans, L.V.E.", year="2015"),
+                        _search_hit(recid=3, title="Other 2009", author="Someone Else", year="2009"),
+                    ]
+                )
+            ]
+        )
+
+        results = client.search("koopmans 2009")
+
+        self.assertEqual([result.recid for result in results], [1])
+        self.assertIn("author%3A%22koopmans%22", client.requested_urls[0])
+        self.assertIn("date%3A2009", client.requested_urls[0])
+        self.assertNotIn("title%3A%222009%22", client.requested_urls[0])
+
     def test_requests_use_timeout(self) -> None:
         client = InspireClient(timeout=7.0)
 

@@ -16,10 +16,12 @@ bibtool update paper/references.bib
 bibtool --bib paper/references.bib --title "GW231123" --y
 bibtool --y --name Otto Hannuksela
 bibtool --query Otto Hannuksela
+bibtool --query koopmans 2009
 bibtool --name Otto Hannuksela
 bibtool --name Otto Hannuksela --title GWTC-5
 bibtool --title GWTC-5
 bibtool search "searching for"
+bibtool search koopmans 2009
 bibtool search --name Otto Hannuksela --title GWTC-5
 bibtool download "searching for"
 bibtool download --name Otto Hannuksela --title GWTC-5 --dir papers
@@ -48,6 +50,7 @@ bibtool --install-completion
 - `update` prefers published INSPIRE records over preprint-only ones and fills in journal, volume, pages, and DOI from INSPIRE metadata when a work has since been published.
 - `search --name ... --title ...` can also combine both filters; results are merged and de-duplicated.
 - Search/import use a looser cuhkvoting-style keyword query across title and author, then apply a case-insensitive local AND filter on the returned metadata.
+- Four-digit years (`19xx`/`20xx`) in `--query` / `search` map to INSPIRE `date:YYYY` and are matched against record year locally.
 - Duplicate detection is case-insensitive and checks title, DOI, and eprint rather than only BibTeX keys.
 - Matching entries are updated in place from INSPIRE or template data while preserving their existing BibTeX keys.
 - arXiv-only `@article` records from INSPIRE get `journal = {arXiv}` so REVTeX/APS BibTeX styles compile cleanly.

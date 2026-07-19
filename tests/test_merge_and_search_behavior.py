@@ -207,6 +207,22 @@ class InspireBehaviorTests(unittest.TestCase):
 
         self.assertEqual([result.recid for result in results], [3])
 
+    def test_search_filters_author_and_year_locally(self) -> None:
+        client = FakeInspireClient(
+            pages=[
+                _search_page(
+                    _search_hit(recid=1, title="Structure of Galaxies", author="Koopmans, L.V.E.", year="2009"),
+                    _search_hit(recid=2, title="Structure of Galaxies", author="Koopmans, L.V.E.", year="2011"),
+                    _search_hit(recid=3, title="Unrelated", author="Other, A.", year="2009"),
+                )
+            ]
+        )
+
+        results = client.search("koopmans 2009", limit=10)
+
+        self.assertEqual([result.recid for result in results], [1])
+        self.assertIn("date%3A2009", client.requested_urls[0])
+
     def test_search_name_and_title_uses_single_author_query(self) -> None:
         client = FakeInspireClient(
             pages=[

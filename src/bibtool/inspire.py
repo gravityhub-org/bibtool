@@ -330,7 +330,14 @@ class InspireClient:
             searchable = tokens
         if not searchable:
             raise InspireError("Search query cannot be empty.")
-        return " and ".join(f'(title:"{_escape_query_token(token)}" or author:"{_escape_query_token(token)}")' for token in searchable)
+        parts: list[str] = []
+        for token in searchable:
+            if _is_year_token(token):
+                parts.append(f"date:{token}")
+                continue
+            escaped = _escape_query_token(token)
+            parts.append(f'(title:"{escaped}" or author:"{escaped}")')
+        return " and ".join(parts)
 
     def _author_query(self, query: str) -> str:
         tokens = _query_tokens(query)
@@ -552,8 +559,14 @@ def _entry_matches_name_and_title(entry: BibEntry, name_words: list[str], title_
 def _result_contains_all_words(result: SearchResult, required_words: list[str]) -> bool:
     if not required_words:
         return True
+    year_words = [word for word in required_words if _is_year_token(word)]
+    text_words = [word for word in required_words if not _is_year_token(word)]
+    if year_words and not _year_matches(result.year, year_words):
+        return False
+    if not text_words:
+        return True
     haystack = normalize_for_match(" ".join([result.title, result.abstract, *result.authors]))
-    return all(word in haystack for word in required_words)
+    return all(word in haystack for word in text_words)
 
 
 def _text_contains_all_words(text: str, required_words: list[str]) -> bool:
@@ -572,13 +585,30 @@ def _entry_contains_all_words(
 ) -> bool:
     if not required_words:
         return True
+    year_words = [word for word in required_words if _is_year_token(word)]
+    text_words = [word for word in required_words if not _is_year_token(word)]
+    if year_words and not _year_matches(entry.year, year_words):
+        return False
+    if not text_words:
+        return True
     fields: list[str] = []
     if include_title:
         fields.append(entry.title)
     if include_author:
         fields.append(entry.author)
     haystack = normalize_for_match(" ".join(fields))
-    return all(word in haystack for word in required_words)
+    return all(word in haystack for word in text_words)
+
+
+def _is_year_token(token: str) -> bool:
+    return bool(_YEAR_TOKEN_RE.fullmatch(token.strip()))
+
+
+def _year_matches(year: str, year_words: list[str]) -> bool:
+    haystack = normalize_for_match(year)
+    if not haystack:
+        return False
+    return all(word in haystack for word in year_words)
 
 
 def _pick_preferred_recid(results: list[SearchResult]) -> int | None:
@@ -595,3 +625,4 @@ def _escape_query_token(token: str) -> str:
 
 
 _STOP_WORDS = {"a", "an", "the", "of", "for", "to", "and", "or", "in", "on", "at", "by", "with"}
+_YEAR_TOKEN_RE = re.compile(r"(?:19|20)\d{2}")

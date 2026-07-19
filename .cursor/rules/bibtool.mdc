@@ -32,6 +32,7 @@ Literature metadata comes from **INSPIRE HEP only** (`inspirehep.net/api/literat
 - Sort output by year, then first author, then title.
 - `search`/`import` share `resolve_lookup` — keep search and fetch query/matcher parity.
 - Search: loose INSPIRE keyword query, then local case-insensitive AND filter on metadata.
+- Year tokens (`19xx`/`20xx`) in free-text query → INSPIRE `date:YYYY` + local year match.
 
 ## CLI
 
