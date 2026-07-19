@@ -105,6 +105,7 @@ class StubProvider:
                 title=entry.title,
                 authors=[part.strip() for part in entry.author.split(" and ") if part.strip()],
                 year=entry.year,
+                arxiv_id=entry.fields.get("eprint", ""),
             )
             for recid, entry in matched
         ]
@@ -489,6 +490,7 @@ class BibtoolCliTests(unittest.TestCase):
                     title="Searching For Gravitational Waves",
                     authors=["Hannuksela, Otto"],
                     year="2025",
+                    arxiv_id="2501.12345",
                 )
             ]
         )
@@ -504,6 +506,7 @@ class BibtoolCliTests(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         self.assertIn("Searching For Gravitational Waves", stdout.getvalue())
         self.assertIn("\033]8;;https://inspirehep.net/literature/101\033\\Searching For Gravitational Waves\033]8;;\033\\", stdout.getvalue())
+        self.assertIn("arXiv:2501.12345", stdout.getvalue())
 
     def test_search_positional_query_uses_unified_provider_search(self) -> None:
         provider = StubProvider(
@@ -726,14 +729,17 @@ def _entry(key: str, *, author: str, title: str, year: str):
 
 
 def _result_to_entry(result: SearchResult) -> BibEntry:
+    fields = {
+        "author": " and ".join(result.authors),
+        "title": result.title,
+        "year": result.year,
+    }
+    if result.arxiv_id:
+        fields["eprint"] = result.arxiv_id
     return BibEntry(
         entry_type="article",
         key=f"Rec{result.recid}",
-        fields={
-            "author": " and ".join(result.authors),
-            "title": result.title,
-            "year": result.year,
-        },
+        fields=fields,
     )
 
 

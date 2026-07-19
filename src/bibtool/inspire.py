@@ -44,6 +44,7 @@ class SearchResult:
     year: str
     abstract: str = ""
     has_journal_publication: bool = False
+    arxiv_id: str = ""
 
     @property
     def first_author(self) -> str:
@@ -358,6 +359,7 @@ def _search_results_from_hits(hits: list[dict[str, Any]]) -> list[SearchResult]:
         title = _title_from_metadata(metadata)
         year = _year_from_metadata(metadata)
         abstract = _abstract_from_metadata(metadata)
+        arxiv_id = _arxiv_id_from_metadata(metadata)
         recid = hit.get("id") or hit.get("metadata", {}).get("control_number")
         if not recid or not title:
             continue
@@ -369,9 +371,18 @@ def _search_results_from_hits(hits: list[dict[str, Any]]) -> list[SearchResult]:
                 year=year,
                 abstract=abstract,
                 has_journal_publication=best_publication_info(metadata) is not None,
+                arxiv_id=arxiv_id,
             )
         )
     return results
+
+
+def _arxiv_id_from_metadata(metadata: dict[str, Any]) -> str:
+    for item in metadata.get("arxiv_eprints", []):
+        value = item.get("value")
+        if value:
+            return str(value)
+    return ""
 
 
 def _title_from_metadata(metadata: dict[str, Any]) -> str:

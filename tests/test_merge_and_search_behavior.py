@@ -246,6 +246,32 @@ class InspireBehaviorTests(unittest.TestCase):
         self.assertTrue(all("Bayesian" in result.title for result in results))
         self.assertEqual(len(client.requested_urls), 2)
 
+    def test_search_includes_arxiv_id_from_metadata(self) -> None:
+        client = RecordingLookupClient(
+            pages=[
+                _search_page(
+                    _search_hit(
+                        recid=3,
+                        title="GWTC-5 Methods",
+                        author="Hannuksela, Otto",
+                        year="2025",
+                        arxiv_id="2501.12345",
+                    ),
+                    _search_hit(
+                        recid=4,
+                        title="GWTC-5 Results",
+                        author="Hannuksela, Otto",
+                        year="2025",
+                    ),
+                )
+            ],
+            bibtex_by_recid={},
+        )
+
+        results = client.search("GWTC-5", limit=10)
+
+        self.assertEqual([result.arxiv_id for result in results], ["2501.12345", ""])
+
     def test_fetch_entry_adds_arxiv_journal_for_preprints(self) -> None:
         client = RecordingLookupClient(
             pages=[],
@@ -353,6 +379,7 @@ class StubProvider:
                 title=entry.title,
                 authors=[part.strip() for part in entry.author.split(" and ") if part.strip()],
                 year=entry.year,
+                arxiv_id=entry.fields.get("eprint", ""),
             )
             for recid, entry in matched
         ]
@@ -427,14 +454,17 @@ def _entry(key: str, *, author: str, title: str, year: str, doi: str | None = No
     return BibEntry(entry_type="article", key=key, fields=fields)
 
 
-def _search_hit(*, recid: int, title: str, author: str, year: str) -> dict:
+def _search_hit(*, recid: int, title: str, author: str, year: str, arxiv_id: str | None = None) -> dict:
+    metadata = {
+        "authors": [{"full_name": author}],
+        "titles": [{"title": title}],
+        "publication_info": [{"year": int(year)}],
+    }
+    if arxiv_id is not None:
+        metadata["arxiv_eprints"] = [{"value": arxiv_id}]
     return {
         "id": recid,
-        "metadata": {
-            "authors": [{"full_name": author}],
-            "titles": [{"title": title}],
-            "publication_info": [{"year": int(year)}],
-        },
+        "metadata": metadata,
     }
 
 

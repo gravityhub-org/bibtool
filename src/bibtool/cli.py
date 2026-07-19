@@ -254,7 +254,8 @@ def _run_search(argv: Sequence[str], *, stdout: TextIO, provider: InspireClient)
         year = result.year or "????"
         url = f"https://inspirehep.net/literature/{result.recid}"
         linked_title = _terminal_link(result.title, url)
-        stdout.write(f"[{result.recid}] {author} ({year}) {linked_title}\n")
+        arxiv = f" arXiv:{result.arxiv_id}" if result.arxiv_id else ""
+        stdout.write(f"[{result.recid}] {author} ({year}) {linked_title}{arxiv}\n")
     return 0
 
 
