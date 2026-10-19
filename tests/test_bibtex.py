@@ -90,6 +90,7 @@ class BibtexTests(unittest.TestCase):
         )
 
         self.assertEqual(entry.fields["journal"], "arXiv")
+        self.assertEqual(entry.fields["number"], "2510.07228")
 
     def test_normalize_inspire_entry_preserves_existing_journal(self) -> None:
         entry = normalize_inspire_entry(
@@ -103,11 +104,13 @@ class BibtexTests(unittest.TestCase):
                     "eprint": "2401.00001",
                     "archiveprefix": "arXiv",
                     "year": "2024",
+                    "number": "2",
                 },
             )
         )
 
         self.assertEqual(entry.fields["journal"], "Phys. Rev. D")
+        self.assertEqual(entry.fields["number"], "2")
 
     def test_enrich_entry_from_metadata_adds_publication_fields(self) -> None:
         entry = enrich_entry_from_metadata(
@@ -120,6 +123,7 @@ class BibtexTests(unittest.TestCase):
                     "eprint": "1410.3852",
                     "archiveprefix": "arXiv",
                     "journal": "arXiv",
+                    "number": "1410.3852",
                     "year": "2014",
                 },
             ),
@@ -167,6 +171,37 @@ class BibtexTests(unittest.TestCase):
         )
 
         self.assertEqual(merged.fields["journal"], "Phys. Rev. D")
+        self.assertEqual(merged.fields["eprint"], "1410.3852")
+
+    def test_merge_entry_fields_keeps_published_number_over_arxiv_eprint(self) -> None:
+        merged = merge_entry_fields(
+            BibEntry(
+                entry_type="article",
+                key="Key",
+                fields={
+                    "journal": "Phys. Rev. D",
+                    "volume": "91",
+                    "number": "8",
+                    "pages": "084034",
+                    "year": "2015",
+                },
+            ),
+            BibEntry(
+                entry_type="article",
+                key="Remote",
+                fields={
+                    "journal": "arXiv",
+                    "eprint": "1410.3852",
+                    "number": "1410.3852",
+                    "year": "2014",
+                },
+            ),
+        )
+
+        self.assertEqual(merged.fields["journal"], "Phys. Rev. D")
+        self.assertEqual(merged.fields["number"], "8")
+        self.assertEqual(merged.fields["volume"], "91")
+        self.assertEqual(merged.fields["pages"], "084034")
         self.assertEqual(merged.fields["eprint"], "1410.3852")
 
     def test_entry_needs_metadata_enrichment(self) -> None:

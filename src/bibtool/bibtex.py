@@ -98,7 +98,10 @@ def normalize_inspire_entry(entry: BibEntry) -> BibEntry:
     archiveprefix = strip_outer_wrappers(normalized.fields.get("archiveprefix", "")).lower()
     if eprint and (not journal or is_arxiv_journal(journal)) and (not archiveprefix or archiveprefix == "arxiv"):
         if not journal or is_arxiv_journal(journal):
+            # journal={arXiv} + number={eprint} → CSL/Typst can render "arXiv:ID"
+            # (Typst does not expose BibTeX eprint to CSL archive_location).
             normalized.fields["journal"] = "arXiv"
+            normalized.fields["number"] = eprint
     return normalized
 
 
@@ -144,15 +147,22 @@ def enrich_entry_from_metadata(entry: BibEntry, metadata: dict) -> BibEntry:
     if publication:
         journal = publication.get("journal_title", "")
         current_journal = strip_outer_wrappers(enriched.fields.get("journal", ""))
+        upgraded_from_arxiv = False
         if journal and (not current_journal or is_arxiv_journal(current_journal)):
             enriched.fields["journal"] = format_inspire_journal_title(str(journal))
+            upgraded_from_arxiv = not current_journal or is_arxiv_journal(current_journal)
 
         for source, target in (
             ("journal_volume", "volume"),
             ("journal_issue", "number"),
         ):
             value = publication.get(source)
-            if value and not strip_outer_wrappers(enriched.fields.get(target, "")):
+            if not value:
+                continue
+            current = strip_outer_wrappers(enriched.fields.get(target, ""))
+            # Preprint normalize sets number=eprint; replace that with the real issue
+            # when upgrading to a journal publication.
+            if not current or (target == "number" and upgraded_from_arxiv):
                 enriched.fields[target] = str(value)
 
         pages = _pages_from_publication_info(publication)
@@ -175,12 +185,18 @@ def enrich_entry_from_metadata(entry: BibEntry, metadata: dict) -> BibEntry:
 
 def merge_entry_fields(existing: BibEntry, incoming: BibEntry) -> BibEntry:
     merged = existing.clone()
+    incoming_is_arxiv = is_arxiv_journal(incoming.fields.get("journal", ""))
     for name, value in incoming.fields.items():
         if not strip_outer_wrappers(value):
             continue
         if name == "journal" and is_arxiv_journal(value):
             current = strip_outer_wrappers(merged.fields.get("journal", ""))
             if current and not is_arxiv_journal(current):
+                continue
+        # Keep published issue/volume/pages over preprint number=eprint.
+        if name in {"number", "volume", "pages"} and incoming_is_arxiv:
+            current_journal = strip_outer_wrappers(merged.fields.get("journal", ""))
+            if current_journal and not is_arxiv_journal(current_journal):
                 continue
         merged.fields[name] = value
 

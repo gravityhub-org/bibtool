@@ -53,7 +53,7 @@ bibtool --install-completion
 - Four-digit years (`19xx`/`20xx`) in `--query` / `search` map to INSPIRE `date:YYYY` and are matched against record year locally.
 - Duplicate detection is case-insensitive and checks title, DOI, and eprint rather than only BibTeX keys.
 - Matching entries are updated in place from INSPIRE or template data while preserving their existing BibTeX keys.
-- arXiv-only `@article` records from INSPIRE get `journal = {arXiv}` so REVTeX/APS BibTeX styles compile cleanly.
+- arXiv-only `@article` records from INSPIRE get `journal = {arXiv}` and `number = {eprint}` so REVTeX/APS BibTeX styles compile cleanly and CSL styles can render `arXiv:ID`.
 - Newly added keys use `FirstAuthorYearFirstTwoTitleWords`, while existing keys in the destination file stay unchanged.
 - Output is sorted by year, then first author, then title.
 - Adding more than 10 entries requires two interactive confirmations unless `--y` is passed.

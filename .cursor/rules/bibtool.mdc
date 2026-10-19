@@ -28,7 +28,7 @@ Literature metadata comes from **INSPIRE HEP only** (`inspirehep.net/api/literat
 - Deduplicate case-insensitively by **title / DOI / eprint**, not BibTeX key.
 - On match: update fields in place; **preserve existing keys**.
 - New keys: `FirstAuthorYearFirstTwoTitleWords`.
-- arXiv-only `@article`: set `journal = {arXiv}` for REVTeX/APS.
+- arXiv-only `@article`: set `journal = {arXiv}` and `number = {eprint}` for REVTeX/APS and CSL `arXiv:ID`.
 - Sort output by year, then first author, then title.
 - `search`/`import` share `resolve_lookup` — keep search and fetch query/matcher parity.
 - Free-text `search`/`--query` tokens that are all arXiv or INSPIRE ids resolve via INSPIRE (`eprint:` / record JSON), never the arXiv API.
